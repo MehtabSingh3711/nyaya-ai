@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+.env
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+.next/
+.vercel/
+
+# Secrets — never commit these
+.env.local
+.env.production
+*.key
+secrets/
+*.pem
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Data — large files, add to Git LFS instead
+data/raw/
+data/processed/
+*.parquet
+
+# Qdrant local storage
+qdrant_storage/
+
+# MLflow
+mlruns/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Logs
+*.log
+logs/
