@@ -26,6 +26,17 @@ Produce three mentor-ready documents by Friday 26 June:
 
 **Q5 — Out of scope:** Criminal law analysis and court judgment research — planned as the next module on the same platform.
 
+---
+
+### Discovery Answers — Initial Design Doc
+**Logged at:** 2026-06-24, 13:30 IST
+
+**Q1 — Headline idea:** Nyaya AI gives anyone in India the same contract review a ₹50,000 lawyer would give them — in 30 seconds, for free.
+
+**Q2 — Biggest technical risk:** LLM hallucinating legal citations — confidently stating a clause violates ICA §27 or the MSME Act when the retrieved context doesn't support it. Mitigation: cite-or-refuse logic — if retrieved evidence is below confidence threshold, system says "I don't know" rather than generating an unsupported legal claim.
+
+**Q3 — End of Week 1 demo:** Mode 2 first — the legal corpus (ICA 1872, MSME Act 2006, IT Act 2000, IPC 1860) fully ingested and a working RAG agent answering plain-language legal questions with citations. Demo question: "Is a non-compete clause enforceable in India?" — answer cites ICA §27, section number, plain-language explanation. Mode 1 built in Week 2 on top of same infrastructure.
+
 ## Code / Output Produced
 
 *(links to commits or key files will be logged here)*
