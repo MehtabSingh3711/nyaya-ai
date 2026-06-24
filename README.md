@@ -30,8 +30,8 @@ with the exact clause cited, page and paragraph.
 
 | Document | Link | Status |
 |---|---|---|
-| Problem Statement | [/docs/problem-statement.md](./docs/problem-statement.md) | In progress |
-| Initial Design Doc | [/docs/initial-design-doc.md](./docs/initial-design-doc.md) | In progress |
+| Problem Statement | [problem-statement.md](problem-statement.md) | Complete |
+| Initial Design Doc | [initial-design-doc.md](initial-design-doc.md) | Complete |
 | Architecture | [/docs/architecture.md](./docs/architecture.md) | In progress |
 | Data Sources | [/docs/data.md](./docs/data.md) | In progress |
 | ADRs | [/docs/adr/](./docs/adr/) | In progress |
