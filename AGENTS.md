@@ -3,7 +3,7 @@
 **Internship:** B.Tech CSE-AIDE, 3rd Year Batch | Segment 3 — Applied AI & Intelligent Systems
 **Problem:** C1 (Contract Intelligence) — Production-Grade Enhanced Edition
 **Duration:** 22 June → 26 July 2026
-**Student:** [YOUR NAME]
+**Student:** Mehtab Singh
 
 ---
 
