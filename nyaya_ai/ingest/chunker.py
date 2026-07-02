@@ -24,8 +24,11 @@ from nyaya_ai.schemas import CorpusChunk
 
 # Matches: "27. Agreements in restraint of trade void.—"
 # Also: "27A. Special provision..." or "124. Sedition.—"
+# Terminator: em-dash (\u2014) or hyphen-minus (\-), NOT period.
+# Indian Acts consistently use "Title.—" (period + em-dash) after section titles.
+# Matching period would cause early termination on titles containing periods.
 SECTION_PATTERN = re.compile(
-    r"^(\d+[A-Z]?)\.\s+(.+?)(?:[\.\u2014\-]|$)",
+    r"^(\d+[A-Z]?)\.\s+(.+?)[\u2014\-]",
     re.MULTILINE,
 )
 
@@ -149,8 +152,11 @@ def chunk_raw_act_text(
             last_chapter = chapter_matches[-1]
             current_chapter = last_chapter.group(1)
 
-        if not section_text or _estimate_tokens(section_text) < MIN_CHUNK_TOKENS:
+        if not section_text:
             continue
+
+        # Short sections are kept — they may contain critical legal definitions.
+        # Only truly empty sections are skipped above.
 
         # Handle long sections: split at sub-section boundaries
         if _estimate_tokens(section_text) > MAX_CHUNK_TOKENS:
