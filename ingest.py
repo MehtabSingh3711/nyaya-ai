@@ -48,7 +48,7 @@ from nyaya_ai.store.qdrant import (
 
 console = Console()
 
-EMBED_BATCH_SIZE = 64
+EMBED_BATCH_SIZE = 32
 UPSERT_BATCH_SIZE = 100
 
 

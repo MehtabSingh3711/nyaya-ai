@@ -37,6 +37,7 @@ data/processed/
 
 # Qdrant local storage
 qdrant_storage/
+qdrant_data/
 
 # MLflow
 mlruns/

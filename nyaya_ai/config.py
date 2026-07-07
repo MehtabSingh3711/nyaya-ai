@@ -1,9 +1,11 @@
 """Centralized configuration for Nyaya AI. All constants live here."""
 
 # ---------------------------------------------------------------------------
-# Qdrant
+# Qdrant — local file-based storage (no Docker needed)
+# Switch to QDRANT_URL = "http://localhost:6333" when using Docker
 # ---------------------------------------------------------------------------
-QDRANT_URL = "http://localhost:6333"
+QDRANT_PATH = "./qdrant_data"    # persistent local storage
+QDRANT_URL = None                # set to "http://localhost:6333" for Docker mode
 COLLECTION_NAME = "nyaya_corpus"
 
 # ---------------------------------------------------------------------------

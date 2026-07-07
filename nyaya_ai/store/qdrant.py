@@ -18,25 +18,43 @@ from qdrant_client.http.exceptions import (
 )
 from rich.console import Console
 
-from nyaya_ai.config import COLLECTION_NAME, EMBEDDING_DIM, QDRANT_URL
+from nyaya_ai.config import COLLECTION_NAME, EMBEDDING_DIM, QDRANT_PATH, QDRANT_URL
 from nyaya_ai.schemas import CorpusChunk
 
 console = Console()
 
+# Singleton client — file-based Qdrant must reuse the same client instance
+_client: QdrantClient | None = None
+
 
 def _get_client() -> QdrantClient:
-    """Create a Qdrant client. Raises ConnectionError if Qdrant is not reachable."""
+    """Get or create a Qdrant client.
+
+    Uses local file storage (QDRANT_PATH) when QDRANT_URL is None.
+    Uses server mode (QDRANT_URL) when set.
+    Raises ConnectionError if server mode and Qdrant is not reachable.
+    """
+    global _client
+    if _client is not None:
+        return _client
+
     try:
-        client = QdrantClient(url=QDRANT_URL, timeout=10)
-        # Test connection with a lightweight call
-        client.get_collections()
-        return client
+        if QDRANT_URL:
+            # Docker / server mode
+            _client = QdrantClient(url=QDRANT_URL, timeout=10)
+            _client.get_collections()  # test connection
+        else:
+            # Local file-based mode (no Docker)
+            _client = QdrantClient(path=QDRANT_PATH)
+        return _client
     except Exception as e:
-        raise ConnectionError(
+        msg = (
             f"Cannot connect to Qdrant at {QDRANT_URL}. "
-            f"Is it running? Start with: docker compose up -d\n"
-            f"Error: {e}"
-        ) from e
+            f"Is it running? Start with: docker compose up -d"
+            if QDRANT_URL
+            else f"Cannot open Qdrant storage at {QDRANT_PATH}: {e}"
+        )
+        raise ConnectionError(f"{msg}\nError: {e}") from e
 
 
 def create_collection() -> None:
