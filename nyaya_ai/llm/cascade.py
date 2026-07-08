@@ -118,13 +118,51 @@ def _call_ollama(
         raise
 
 
+def _extract_json(raw: str) -> str:
+    """Extract JSON object from noisy LLM output.
+
+    Handles common issues:
+    - Markdown fences: ```json ... ```
+    - Text before/after the JSON object
+    - Leading/trailing whitespace
+    """
+    import re
+
+    text = raw.strip()
+
+    # Strip markdown fences: ```json ... ``` or ``` ... ```
+    fence_match = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", text, re.DOTALL)
+    if fence_match:
+        text = fence_match.group(1).strip()
+
+    # Find the outermost { ... } pair
+    start = text.find("{")
+    if start == -1:
+        raise ValueError(f"No JSON object found in LLM response: {raw[:200]}")
+
+    # Count braces to find the matching closing brace
+    depth = 0
+    for i in range(start, len(text)):
+        if text[i] == "{":
+            depth += 1
+        elif text[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+
+    raise ValueError(f"Unbalanced braces in LLM response: {raw[:200]}")
+
+
 def _parse_response(raw: str) -> CitedAnswer:
     """Parse and validate the raw LLM response into a CitedAnswer.
+
+    Extracts JSON from noisy output before validating with Pydantic.
 
     Raises:
         ValueError: If the response is not valid JSON or fails Pydantic validation.
     """
-    return CitedAnswer.model_validate_json(raw)
+    cleaned = _extract_json(raw)
+    return CitedAnswer.model_validate_json(cleaned)
 
 
 def _make_fallback(reason: str) -> CitedAnswer:

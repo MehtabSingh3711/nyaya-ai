@@ -18,7 +18,7 @@ EMBEDDING_DIM = 1024
 # LLM — Ollama / Phi-3 Mini (ADR-004)
 # ---------------------------------------------------------------------------
 OLLAMA_BASE_URL = "http://localhost:11434/v1"
-OLLAMA_MODEL = "phi3:3.8b"
+OLLAMA_MODEL = "llama3.2:3b"
 
 # ---------------------------------------------------------------------------
 # Cascade thresholds (ADR-004)
