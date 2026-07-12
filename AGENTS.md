@@ -7,6 +7,56 @@
 
 ---
 
+## STATUS AS OF 2026-07-12 — READ THIS FIRST
+
+**Build tool history:** Weeks 0–2 (documents, architecture, ADRs, Layers 1–4 CLI core) were built using Antigravity (Gemini) with the decision protocol in this file. From 2026-07-12 onward, development continues in ChatGPT Codex. All rules, protocols, and decision logging requirements in this file apply identically to Codex — nothing changes except the tool.
+
+### What is DONE and WORKING right now
+
+- **Mode 2 (Legal Intelligence Chat)** — fully working CLI (`ingest.py` + `query.py`)
+- **Statutory corpus ingested:** `mratanusarkar/Indian-Laws`, 33,603 sections, 1,021 Acts, indexed in Qdrant (`nyaya_corpus` collection, local file-based storage at `./qdrant_data`)
+- **Embedding:** BGE-M3 (BAAI/bge-m3, 1024-dim), done via Google Colab T4 GPU (batch size 8 to avoid CUDA OOM), snapshot exported and imported locally
+- **LLM cascade:** Originally Phi-3 Mini → Gemma-2-9B → OpenRouter (all local via Ollama, per ADR-004). **REPLACED** because of ~5 min/query latency on local CPU inference. New cascade:
+  - Tier 1: **Groq** (Llama 3.1 8B Instant) — near-instant, free tier
+  - Tier 2: **Gemini** (2.5 Flash Lite via OpenAI-compatible endpoint) — free tier
+  - Tier 3: **OpenRouter** (Qwen 3 Next 80B, free tier)
+  - See ADR-004 Amendment below. All tiers remain ₹0 cost.
+- **Cite-or-refuse** confirmed working — confidence < 0.7 triggers "Insufficient Information" yellow panel
+- **88 tests passing** across schemas (22), dedup (10), chunker (10), embedder (8), qdrant store (13), cascade (20), plus 5 extract_json tests
+- **geekyrakshit dataset DROPPED** — `mratanusarkar` alone is the full corpus source (34,244 raw rows → 33,603 indexed after empty/dedup filtering)
+- **API keys:** Loaded from `.env` via `python-dotenv`. `.env` is gitignored.
+
+### What is NOT yet built
+
+- Mode 1 (Contract Intelligence / automatic scan) — not started
+- Structured clause extraction from user-uploaded contracts
+- Risk scan engines (ICA §27, MSME, and the potential generic corpus-wide scanner — see open decision below)
+- Semantic Clause Diff Engine (F3)
+- Agentic Batch Sweep (F5)
+- Eval harness (RAGAS + custom citation metric) — not started
+- FastAPI, Celery, Redis — not started, still CLI-only
+- Next.js frontend — not started
+- Langfuse + structlog observability — not started
+- Deployment (Railway + Vercel) — not started
+
+### Open architectural decision pending first Codex session
+
+The hero feature is being reconsidered. Instead of two hardcoded engines (ICA §27 only, MSME Act only), the plan is a **single generic risk scanner** that checks every contract clause against the ENTIRE `nyaya_corpus` (1,021 Acts), so any clause type against any Indian law can be caught — not just two hardcoded rules. This decision should be finalized and logged as an ADR in the first Codex session.
+
+### ADR-004 Amendment — LLM Cascade Change (2026-07-12)
+
+**Original decision (2026-06-26):** Phi-3 Mini → Gemma-2-9B → OpenRouter free tier, all local via Ollama.
+
+**Amendment:** Replaced with Groq (Llama 3.1 8B) → Gemini 2.5 Flash Lite → OpenRouter (Qwen 3 Next 80B free tier).
+
+**Reason:** Local Ollama inference on CPU took ~5 minutes per query — unusable for a demo. Phi-3 caused OOM with BGE-M3 loaded. Switched to `qwen:0.5b` (bad JSON output), then `llama3.2:3b` (marginal). Cloud APIs solve both latency and memory constraints while remaining ₹0 cost on free tiers. Groq's inference speed makes Tier 1 respond in ~2 seconds.
+
+**Cost impact:** Still ₹0 — all three tiers use free API plans.
+
+**Data egress impact:** All queries now leave the local machine (unlike original design where Tiers 1-2 were local). Acceptable for the internship demo phase. Can revert to local inference on a GPU-equipped deployment target if needed.
+
+---
+
 ## 0. BEFORE ANYTHING ELSE — read this section fully
 
 You are not a code generator. You are a **senior engineering thought partner**.
@@ -89,7 +139,7 @@ Write the session header:
 
 ```markdown
 # AI Session Log — [date] — [topic]
-**Agent:** Antigravity (Gemini)
+**Agent:** [Antigravity (Gemini) | ChatGPT Codex]
 **Phase:** Week N — [Foundation | Core | Hardening | Ship]
 **Session opened:** [time if available]
 
@@ -287,8 +337,8 @@ Output: clause, violation, statutory remedy.
 Two contract versions → semantic diff showing what changed and what got riskier.
 
 **F4 — Cost Cascade Architecture**
-Phi-3 Mini → Gemma-2-9B → GPT-4o, escalating on low confidence.
-Target: < ₹0.50 per contract for 95% of queries.
+~~Phi-3 Mini → Gemma-2-9B → GPT-4o~~ → **Groq (Llama 3.1 8B) → Gemini 2.5 Flash Lite → OpenRouter (Qwen 3 Next 80B free)**, escalating on low confidence.
+Target: ₹0 per contract (all free tiers). See ADR-004 Amendment in STATUS section.
 
 **F5 — Agentic Batch Sweep**
 Scan a folder of contracts. Return ranked results for a natural-language query.
@@ -310,17 +360,19 @@ Minimum 200 contracts. Documented in /docs/data.md.
 |---|---|---|
 | Document parsing | PyMuPDF + Unstructured.io | Pending |
 | OCR | PaddleOCR | Pending |
-| Chunking strategy | Structural + semantic fallback | Pending |
-| Embeddings | BGE-M3 | Pending |
-| Vector DB | Qdrant | Pending |
-| Retrieval | BM25 + dense hybrid + rerank | Pending |
-| LLM cascade | Phi-3 → Gemma-2 → GPT-4o | Pending |
-| Extraction | Pydantic v2 + JSON mode | Pending |
+| Chunking strategy | Structural + semantic fallback | ✅ Confirmed — regex section boundary + sub-section split |
+| Embeddings | BGE-M3 | ✅ Confirmed — BAAI/bge-m3, 1024-dim |
+| Vector DB | Qdrant | ✅ Confirmed — local file-based mode, `nyaya_corpus` collection |
+| Retrieval | BM25 + dense hybrid + rerank | Partial — dense only. BM25 hybrid + reranker NOT yet built |
+| LLM cascade | ~~Phi-3 → Gemma-2 → GPT-4o~~ Groq (Llama 3.1 8B) → Gemini 2.5 Flash Lite → OpenRouter (Qwen 3 Next 80B free) | ✅ Confirmed — ADR-004 amended 2026-07-12 |
+| Extraction | Pydantic v2 + JSON mode | ✅ Confirmed — CitedAnswer + CorpusChunk schemas |
 | Eval | RAGAS + custom citation metric | Pending |
 | Backend | FastAPI | Pending |
 | Frontend | Next.js or Streamlit | Pending |
 | Deployment | Railway + Vercel | Pending |
 | Tracing | Langfuse | Pending |
+
+> **Note (2026-07-12):** LLM cascade changed from fully-local Ollama stack to fast API-based cascade due to ~5 min/query latency on local Phi-3 inference. Groq's inference speed makes Tier 1 near-instant (~2s). All tiers remain free tier (₹0).
 
 Every "Pending" must be resolved via the decision protocol and logged
 in the session file before that component is built.
@@ -368,7 +420,7 @@ Every session produces one file: /docs/ai-conversations/YYYY-MM-DD_[topic].md
 
 ```markdown
 # AI Session Log — [date] — [topic]
-**Agent:** Antigravity (Gemini)
+**Agent:** [Antigravity (Gemini) | ChatGPT Codex]
 **Phase:** Week N — [phase name]
 **Session opened:** [time]
 

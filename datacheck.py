@@ -1,17 +1,15 @@
 from datasets import load_dataset
 ds = load_dataset("mratanusarkar/Indian-Laws", split="train")
 
-# Print all unique act titles
-act_titles = set(ds["act_title"])
-print(f"Total unique Acts: {len(act_titles)}")
-print(f"Total sections: {len(ds)}")
+it_act_sections = [r for r in ds if r["act_title"] == "Information Technology Act, 2000"]
+print(f"IT Act sections found: {len(it_act_sections)}")
 
-# Check your key Acts are present
-key_acts = ["Indian Contract Act", "MSME", "Information Technology", 
-            "Indian Penal Code", "Code of Civil Procedure"]
-for key in key_acts:
-    matches = [t for t in act_titles if key.lower() in t.lower()]
-    print(f"\n{key}: {matches}")
+# The 2008 amendment added Section 66A, 69A, 43A among others
+# Check if these post-amendment sections exist
+section_numbers = [r["section"] for r in it_act_sections]
+print("Sample sections:", section_numbers[:20])
 
-msme_matches = [t for t in act_titles if "micro" in t.lower() or "small" in t.lower() or "medium" in t.lower()]
-print(msme_matches)
+# Look specifically for amendment-era sections
+amendment_sections = ["43A", "66A", "66B", "66C", "66D", "66E", "66F", "69A", "69B"]
+found = [s for s in amendment_sections if any(s in sec for sec in section_numbers)]
+print(f"Post-2008-amendment sections found: {found}")

@@ -219,6 +219,8 @@ Embed (BGE-M3) + encode (SPLADE) → index into nyaya_corpus
 
 **Versioning:** corpus version tag on every chunk. When an Act is updated, old chunks are soft-deleted (Qdrant payload filter) and new chunks indexed with the new version. No reindex required for chunks belonging to other Acts.
 
+> **Current limitation:** Mode 1 initially relies on the existing `mratanusarkar/Indian-Laws` snapshot. Its amendment currency has not been verified against India Code for every Act, so findings must not be represented as a guarantee of amendment-current law.
+
 ---
 
 ## 5. Retrieval Pipeline
@@ -525,6 +527,10 @@ Langfuse self-hosted in Docker. RAGAS scores attached to traces. Every Mode 2 se
 | **Week 4** | Frontend (Next.js + shadcn/ui). Langfuse + structlog instrumented. All five mandatory events logged. Eval dashboard live in UI. |
 | **Week 5** | Hardening. Final eval run. Eval numbers locked. README complete. Deployment (TBD). Loom walkthrough recorded. |
 
+### Week 3+ Stretch Goals
+
+- **ADR-011 — Upgrade critical statutory sources for amendment currency** *(planned, not yet built)*: replace the critical ICA, MSME Act, IT Act, IPC, and CPC source material from `mratanusarkar/Indian-Laws` with India Code (`indiacode.nic.in`) versions, then reindex those Acts with source URLs and version metadata. This is scheduled after Mode 1 is functional and does not block the current sprint.
+
 ---
 
 ## 14. ADR Index
@@ -541,6 +547,7 @@ Langfuse self-hosted in Docker. RAGAS scores attached to traces. Every Mode 2 se
 | [ADR-008](./adr/ADR-008-evaluation-framework.md) | Evaluation framework | Accepted |
 | [ADR-009](./adr/ADR-009-observability.md) | Observability and tracing | Accepted |
 | ADR-010 | Deployment strategy | TBD — Week 4/5 |
+| ADR-011 | Upgrade critical statutory sources for amendment currency | Planned — not yet built |
 
 ---
 
