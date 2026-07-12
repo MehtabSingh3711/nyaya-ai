@@ -15,8 +15,34 @@ EMBEDDING_MODEL = "BAAI/bge-m3"
 EMBEDDING_DIM = 1024
 
 # ---------------------------------------------------------------------------
-# LLM — Ollama / Phi-3 Mini (ADR-004)
+# LLM — 3-Tier Cloud Cascade (ADR-004)
+#   Tier 1: Groq (Llama 3.3 70B) — fast, free tier
+#   Tier 2: Gemini 1.5 Flash — Google AI, generous free tier
+#   Tier 3: OpenRouter — free-tier models (GLM/Qwen/Kimi)
 # ---------------------------------------------------------------------------
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+# Tier 1 — Groq
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+GROQ_MODEL = "llama-3.1-8b-instant"
+
+# Tier 2 — Gemini (via OpenAI-compatible endpoint)
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+GEMINI_MODEL = "gemini-2.5-flash-lite"
+
+# Tier 3 — OpenRouter free tier
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+OPENROUTER_MODEL = "qwen/qwen3-next-80b-a3b-instruct:free"  # free-tier model
+
+# Ollama (local fallback — kept for offline dev)
 OLLAMA_BASE_URL = "http://localhost:11434/v1"
 OLLAMA_MODEL = "llama3.2:3b"
 

@@ -1,6 +1,6 @@
-"""Tests for nyaya_ai.llm.cascade — confidence-threshold LLM cascade.
+"""Tests for nyaya_ai.llm.cascade — 3-tier cloud LLM cascade.
 
-All tests mock the Ollama HTTP call — no real LLM inference.
+All tests mock the LLM HTTP calls — no real API calls.
 """
 
 import json
@@ -8,7 +8,13 @@ import json
 import pytest
 from unittest.mock import patch, MagicMock
 
-from nyaya_ai.llm.cascade import cascade_query, _format_context, _parse_response
+from nyaya_ai.llm.cascade import (
+    cascade_query,
+    _format_context,
+    _extract_json,
+    _parse_response,
+    _try_tier,
+)
 from nyaya_ai.schemas import CitedAnswer
 
 
@@ -86,6 +92,33 @@ class TestFormatContext:
 
 
 # ===================================================================
+# _extract_json tests
+# ===================================================================
+
+class TestExtractJson:
+
+    def test_clean_json(self):
+        raw = '{"answer": "test", "confidence": 0.9}'
+        assert _extract_json(raw) == raw
+
+    def test_strips_markdown_fences(self):
+        raw = '```json\n{"answer": "test"}\n```'
+        assert _extract_json(raw) == '{"answer": "test"}'
+
+    def test_strips_text_before_json(self):
+        raw = 'Here is the answer:\n{"answer": "test"}'
+        assert _extract_json(raw) == '{"answer": "test"}'
+
+    def test_no_json_raises(self):
+        with pytest.raises(ValueError, match="No JSON"):
+            _extract_json("just plain text")
+
+    def test_nested_braces(self):
+        raw = '{"a": {"b": "c"}, "d": "e"}'
+        assert _extract_json(raw) == raw
+
+
+# ===================================================================
 # _parse_response tests
 # ===================================================================
 
@@ -106,45 +139,52 @@ class TestParseResponse:
         with pytest.raises((ValueError, Exception)):
             _parse_response(json.dumps({"answer": "test"}))
 
+    def test_fenced_json_parses(self):
+        """JSON wrapped in markdown fences should still parse."""
+        fenced = f"```json\n{VALID_RESPONSE_JSON}\n```"
+        answer = _parse_response(fenced)
+        assert answer.can_answer is True
+
 
 # ===================================================================
-# cascade_query tests
+# cascade_query — full cascade tests
 # ===================================================================
 
 class TestCascadeQuery:
 
-    @patch("nyaya_ai.llm.cascade._call_ollama")
-    def test_valid_response_parses_correctly(self, mock_ollama):
-        mock_ollama.return_value = VALID_RESPONSE_JSON
+    @patch("nyaya_ai.llm.cascade._call_groq")
+    def test_tier1_valid_response(self, mock_groq):
+        """Tier 1 returns valid JSON → answer returned, no escalation."""
+        mock_groq.return_value = VALID_RESPONSE_JSON
         result = cascade_query("Is non-compete enforceable?", SAMPLE_CHUNKS)
 
         assert isinstance(result, CitedAnswer)
         assert result.can_answer is True
         assert result.confidence == 0.92
         assert result.citations[0].section == "27"
-        assert "restrained" in result.citations[0].quote
+        mock_groq.assert_called_once()
 
-    @patch("nyaya_ai.llm.cascade._call_ollama")
-    def test_low_confidence_sets_cant_answer(self, mock_ollama):
-        """Confidence below CONFIDENCE_THRESHOLD → can_answer forced to False."""
-        mock_ollama.return_value = LOW_CONFIDENCE_RESPONSE_JSON
+    @patch("nyaya_ai.llm.cascade._call_groq")
+    def test_low_confidence_sets_cant_answer(self, mock_groq):
+        """Confidence below threshold → can_answer forced to False."""
+        mock_groq.return_value = LOW_CONFIDENCE_RESPONSE_JSON
         result = cascade_query("Some vague question", SAMPLE_CHUNKS)
 
         assert result.can_answer is False
         assert result.confidence == 0.4
 
-    @patch("nyaya_ai.llm.cascade._call_ollama")
-    def test_cite_or_refuse_response(self, mock_ollama):
-        mock_ollama.return_value = CANT_ANSWER_RESPONSE_JSON
+    @patch("nyaya_ai.llm.cascade._call_groq")
+    def test_cite_or_refuse_response(self, mock_groq):
+        mock_groq.return_value = CANT_ANSWER_RESPONSE_JSON
         result = cascade_query("What is criminal law?", SAMPLE_CHUNKS)
 
         assert result.can_answer is False
         assert len(result.citations) == 0
 
-    @patch("nyaya_ai.llm.cascade._call_ollama")
-    def test_retry_on_validation_failure(self, mock_ollama):
-        """First call returns garbage, second returns valid JSON."""
-        mock_ollama.side_effect = [
+    @patch("nyaya_ai.llm.cascade._call_groq")
+    def test_retry_on_validation_failure(self, mock_groq):
+        """First call garbage, second call valid → answer returned."""
+        mock_groq.side_effect = [
             "not valid json",
             VALID_RESPONSE_JSON,
         ]
@@ -152,40 +192,81 @@ class TestCascadeQuery:
 
         assert isinstance(result, CitedAnswer)
         assert result.can_answer is True
-        assert mock_ollama.call_count == 2
+        assert mock_groq.call_count == 2
 
-    @patch("nyaya_ai.llm.cascade._call_ollama")
-    def test_fallback_after_all_retries_exhausted(self, mock_ollama):
-        """All retry attempts return garbage → fallback response."""
-        mock_ollama.return_value = "still not valid json"
+    @patch("nyaya_ai.llm.cascade._call_openrouter")
+    @patch("nyaya_ai.llm.cascade._call_gemini")
+    @patch("nyaya_ai.llm.cascade._call_groq")
+    def test_escalation_tier1_to_tier2(self, mock_groq, mock_gemini, mock_openrouter):
+        """Tier 1 fails → escalates to Tier 2 which succeeds."""
+        mock_groq.side_effect = ConnectionError("Groq down")
+        mock_gemini.return_value = VALID_RESPONSE_JSON
+
+        result = cascade_query("Test question", SAMPLE_CHUNKS)
+
+        assert isinstance(result, CitedAnswer)
+        assert result.can_answer is True
+        mock_groq.assert_called_once()
+        mock_gemini.assert_called_once()
+        mock_openrouter.assert_not_called()
+
+    @patch("nyaya_ai.llm.cascade._call_openrouter")
+    @patch("nyaya_ai.llm.cascade._call_gemini")
+    @patch("nyaya_ai.llm.cascade._call_groq")
+    def test_escalation_all_tiers_to_tier3(self, mock_groq, mock_gemini, mock_openrouter):
+        """Tier 1 and 2 fail → Tier 3 succeeds."""
+        mock_groq.side_effect = ConnectionError("Groq down")
+        mock_gemini.side_effect = ConnectionError("Gemini down")
+        mock_openrouter.return_value = VALID_RESPONSE_JSON
+
+        result = cascade_query("Test question", SAMPLE_CHUNKS)
+
+        assert isinstance(result, CitedAnswer)
+        assert result.can_answer is True
+        mock_openrouter.assert_called_once()
+
+    @patch("nyaya_ai.llm.cascade._call_openrouter")
+    @patch("nyaya_ai.llm.cascade._call_gemini")
+    @patch("nyaya_ai.llm.cascade._call_groq")
+    def test_all_tiers_fail_returns_fallback(self, mock_groq, mock_gemini, mock_openrouter):
+        """All 3 tiers fail → cite-or-refuse fallback."""
+        mock_groq.side_effect = ConnectionError("Groq down")
+        mock_gemini.side_effect = ConnectionError("Gemini down")
+        mock_openrouter.side_effect = ConnectionError("OpenRouter down")
+
         result = cascade_query("Test question", SAMPLE_CHUNKS)
 
         assert isinstance(result, CitedAnswer)
         assert result.can_answer is False
         assert result.confidence == 0.0
-        assert "Unable to parse" in result.answer
+        assert "Unable to get" in result.answer
 
-    @patch("nyaya_ai.llm.cascade._call_ollama")
-    def test_connection_error_returns_fallback(self, mock_ollama):
-        """Ollama not running → graceful fallback, not a crash."""
-        mock_ollama.side_effect = ConnectionError("Cannot connect to Ollama")
+    @patch("nyaya_ai.llm.cascade._call_openrouter")
+    @patch("nyaya_ai.llm.cascade._call_gemini")
+    @patch("nyaya_ai.llm.cascade._call_groq")
+    def test_parse_failure_escalates(self, mock_groq, mock_gemini, mock_openrouter):
+        """Tier 1 returns garbage on all retries → escalates to Tier 2."""
+        mock_groq.return_value = "still not valid json"
+        mock_gemini.return_value = VALID_RESPONSE_JSON
+
         result = cascade_query("Test question", SAMPLE_CHUNKS)
 
         assert isinstance(result, CitedAnswer)
-        assert result.can_answer is False
-        assert "language model" in result.answer.lower()
+        assert result.can_answer is True
+        # Groq called 1 + MAX_RETRIES times, Gemini called once
+        assert mock_groq.call_count >= 2
+        mock_gemini.assert_called_once()
 
-    @patch("nyaya_ai.llm.cascade._call_ollama")
-    def test_never_raises(self, mock_ollama):
+    @patch("nyaya_ai.llm.cascade._call_openrouter")
+    @patch("nyaya_ai.llm.cascade._call_gemini")
+    @patch("nyaya_ai.llm.cascade._call_groq")
+    def test_never_raises(self, mock_groq, mock_gemini, mock_openrouter):
         """cascade_query should NEVER raise — always returns a CitedAnswer."""
-        mock_ollama.side_effect = RuntimeError("Unexpected error")
+        mock_groq.side_effect = RuntimeError("Unexpected")
+        mock_gemini.side_effect = RuntimeError("Unexpected")
+        mock_openrouter.side_effect = RuntimeError("Unexpected")
 
-        # This should not raise — the function catches all exceptions
-        # If it does raise, the test fails
-        try:
-            result = cascade_query("Test", SAMPLE_CHUNKS)
-            # If we get here, it returned a fallback
-            assert isinstance(result, CitedAnswer)
-        except RuntimeError:
-            # The cascade let an exception escape — this is a bug
-            pytest.fail("cascade_query raised an exception instead of returning a fallback")
+        result = cascade_query("Test", SAMPLE_CHUNKS)
+
+        assert isinstance(result, CitedAnswer)
+        assert result.can_answer is False
