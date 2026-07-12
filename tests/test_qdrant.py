@@ -167,3 +167,35 @@ class TestGetPointCount:
     def test_none_count_returns_zero(self, mock_client):
         mock_client.get_collection.return_value = SimpleNamespace(points_count=None)
         assert get_point_count() == 0
+
+
+# ===================================================================
+# Collection parameterization tests
+# ===================================================================
+
+class TestCollectionParameterization:
+
+    def test_custom_collection_create(self, mock_client):
+        mock_client.get_collections.return_value = SimpleNamespace(collections=[])
+        create_collection("custom_col")
+        # Check custom collection was created
+        mock_client.create_collection.assert_called_once()
+        assert mock_client.create_collection.call_args[1]["collection_name"] == "custom_col"
+
+    def test_custom_collection_upsert(self, mock_client):
+        chunk = _make_chunk()
+        upsert_chunks([chunk], [[0.1] * 1024], collection_name="custom_col")
+        mock_client.upsert.assert_called_once()
+        assert mock_client.upsert.call_args[1]["collection_name"] == "custom_col"
+
+    def test_custom_collection_search(self, mock_client):
+        mock_client.query_points.return_value = SimpleNamespace(points=[])
+        search(query_vector=[0.1] * 1024, collection_name="custom_col")
+        mock_client.query_points.assert_called_once()
+        assert mock_client.query_points.call_args[1]["collection_name"] == "custom_col"
+
+    def test_custom_collection_point_count(self, mock_client):
+        mock_client.get_collection.return_value = SimpleNamespace(points_count=10)
+        assert get_point_count("custom_col") == 10
+        mock_client.get_collection.assert_called_once_with(collection_name="custom_col")
+

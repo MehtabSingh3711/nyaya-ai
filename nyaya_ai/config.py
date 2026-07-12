@@ -1,11 +1,16 @@
 """Centralized configuration for Nyaya AI. All constants live here."""
 
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 # ---------------------------------------------------------------------------
 # Qdrant — local file-based storage (no Docker needed)
 # Switch to QDRANT_URL = "http://localhost:6333" when using Docker
 # ---------------------------------------------------------------------------
 QDRANT_PATH = "./qdrant_data"    # persistent local storage
-QDRANT_URL = None                # set to "http://localhost:6333" for Docker mode
+QDRANT_URL = os.getenv("QDRANT_URL", None)  # e.g. "http://localhost:6333" for Docker mode
 COLLECTION_NAME = "nyaya_corpus"
 
 # ---------------------------------------------------------------------------
@@ -20,11 +25,6 @@ EMBEDDING_DIM = 1024
 #   Tier 2: Gemini 1.5 Flash — Google AI, generous free tier
 #   Tier 3: OpenRouter — free-tier models (GLM/Qwen/Kimi)
 # ---------------------------------------------------------------------------
-import os
-
-from dotenv import load_dotenv
-
-load_dotenv()
 
 
 # Tier 1 — Groq
@@ -35,12 +35,12 @@ GROQ_MODEL = "llama-3.1-8b-instant"
 # Tier 2 — Gemini (via OpenAI-compatible endpoint)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
-GEMINI_MODEL = "gemini-2.5-flash-lite"
+GEMINI_MODEL = "gemini-3.1-flash-lite"
 
 # Tier 3 — OpenRouter free tier
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-OPENROUTER_MODEL = "qwen/qwen3-next-80b-a3b-instruct:free"  # free-tier model
+OPENROUTER_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"  # free-tier model
 
 # Ollama (local fallback — kept for offline dev)
 OLLAMA_BASE_URL = "http://localhost:11434/v1"
@@ -76,3 +76,9 @@ HF_DATASETS = {
 # ---------------------------------------------------------------------------
 MAX_CHUNK_TOKENS = 1000   # split sections longer than this
 MIN_CHUNK_TOKENS = 50     # merge sections shorter than this
+
+# ---------------------------------------------------------------------------
+# Contract Intelligence (Mode 1)
+# ---------------------------------------------------------------------------
+CONTRACT_RELEVANCE_THRESHOLD = 0.50
+CONTRACT_RISK_TOP_K = 10

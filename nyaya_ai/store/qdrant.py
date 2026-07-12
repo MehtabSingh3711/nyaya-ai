@@ -19,7 +19,7 @@ from qdrant_client.http.exceptions import (
 from rich.console import Console
 
 from nyaya_ai.config import COLLECTION_NAME, EMBEDDING_DIM, QDRANT_PATH, QDRANT_URL
-from nyaya_ai.schemas import CorpusChunk
+from nyaya_ai.schemas import CorpusChunk, ClauseExtraction
 
 console = Console()
 
@@ -57,22 +57,22 @@ def _get_client() -> QdrantClient:
         raise ConnectionError(f"{msg}\nError: {e}") from e
 
 
-def create_collection() -> None:
-    """Create the nyaya_corpus collection with dense vector config.
+def create_collection(collection_name: str = COLLECTION_NAME) -> None:
+    """Create a collection with dense vector config.
 
     Idempotent — does nothing if the collection already exists.
     """
     client = _get_client()
 
     existing = [c.name for c in client.get_collections().collections]
-    if COLLECTION_NAME in existing:
+    if collection_name in existing:
         console.print(
-            f"[yellow]Collection '{COLLECTION_NAME}' already exists — skipping creation.[/]"
+            f"[yellow]Collection '{collection_name}' already exists — skipping creation.[/]"
         )
         return
 
     client.create_collection(
-        collection_name=COLLECTION_NAME,
+        collection_name=collection_name,
         vectors_config={
             "dense": qmodels.VectorParams(
                 size=EMBEDDING_DIM,
@@ -80,18 +80,20 @@ def create_collection() -> None:
             ),
         },
     )
-    console.print(f"[green]Created collection '{COLLECTION_NAME}' (dim={EMBEDDING_DIM}, cosine).[/]")
+    console.print(f"[green]Created collection '{collection_name}' (dim={EMBEDDING_DIM}, cosine).[/]")
 
 
 def upsert_chunks(
-    chunks: list[CorpusChunk],
+    chunks: list[CorpusChunk] | list[ClauseExtraction],
     vectors: list[list[float]],
+    collection_name: str = COLLECTION_NAME,
 ) -> None:
-    """Batch upsert chunks with their embedding vectors into nyaya_corpus.
+    """Batch upsert chunks with their embedding vectors.
 
     Args:
-        chunks: List of CorpusChunk objects (uses to_payload() for the payload).
+        chunks: List of CorpusChunk or ClauseExtraction objects (uses to_payload() for payload).
         vectors: Corresponding list of dense embedding vectors.
+        collection_name: Target collection name in Qdrant.
 
     Raises:
         ValueError: If chunks and vectors have different lengths.
@@ -122,22 +124,24 @@ def upsert_chunks(
     for i in range(0, len(points), batch_size):
         batch = points[i : i + batch_size]
         client.upsert(
-            collection_name=COLLECTION_NAME,
+            collection_name=collection_name,
             points=batch,
         )
 
-    console.print(f"[green]Upserted {len(points)} points into '{COLLECTION_NAME}'.[/]")
+    console.print(f"[green]Upserted {len(points)} points into '{collection_name}'.[/]")
 
 
 def search(
     query_vector: list[float],
     top_k: int = 5,
+    collection_name: str = COLLECTION_NAME,
 ) -> list[dict]:
-    """Dense cosine search against nyaya_corpus.
+    """Dense cosine search.
 
     Args:
         query_vector: The query embedding vector (1024-dim).
         top_k: Number of results to return.
+        collection_name: Target collection name in Qdrant.
 
     Returns:
         List of dicts, each containing the payload fields plus a 'score' field.
@@ -149,7 +153,7 @@ def search(
     client = _get_client()
 
     results = client.query_points(
-        collection_name=COLLECTION_NAME,
+        collection_name=collection_name,
         query=query_vector,
         using="dense",
         limit=top_k,
@@ -164,13 +168,13 @@ def search(
     return hits
 
 
-def get_point_count() -> int:
-    """Return the total number of points in the nyaya_corpus collection.
+def get_point_count(collection_name: str = COLLECTION_NAME) -> int:
+    """Return the total number of points in the specified collection.
 
     Raises:
         ConnectionError: If Qdrant is not reachable.
     """
     client = _get_client()
 
-    info = client.get_collection(collection_name=COLLECTION_NAME)
+    info = client.get_collection(collection_name=collection_name)
     return info.points_count or 0

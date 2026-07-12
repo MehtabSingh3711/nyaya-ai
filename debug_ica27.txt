@@ -1,0 +1,108 @@
+Total points scanned: 33603
+Unique Acts with 'contract' in name: ['Securities Contracts (Regulation) Act, 1956', 'Bilateral Netting of Qualified Financial Contracts Act, 2020', 'Forward Contracts (Regulation) Act, 1952', 'Indian Contract Act, 1872', 'Contract Labour (Regulation and Abolition) Act, 1970']
+Found 4 matches in full database:
+
+Act: Contract Labour (Regulation and Abolition) Act, 1970
+Section: 27
+Text: Contact Labour (Regulation and Abolition) Act, 1970
+27. Limitation of prosecutions
+No court shall take cognizance of an offence punishable under
+
+this Act unless the complaint thereof is made within three months from the date
+
+on which the alleged commission of the offence came to the knowledge of an
+
+inspector:
+PROVIDED that where the offence consists of disobeying
+
+a written order made by an inspector, complaint, thereof may be made within six
+
+months of the date on which the offence is alleged to have been committed.
+
+Act: Forward Contracts (Regulation) Act, 1952
+Section: 27
+Text: 27. Power to exempt.-
+The Central Government may, by notification in the Official Gazette, exempt, subject to such conditions and in such circumstances and in such areas as may be specified in the notification, any contract or class of contracts from the operation of all or any of the provisions of this Act.
+1. Ins. by Act 62 of 1960, s. 20 (w.e.f. 28-12-1960).
+2. Subs. by s. 21, ibid., for certain words (w.e.f. 28-12-1960).
+
+Act: Indian Contract Act, 1872
+Section: 27
+Text: Indian Contract Act, 1872 
+27. Agreement in restraint of trade,
+
+void
+Every agreement by which anyone is restrained from exercising a
+
+lawful profession, trade or business of any kind, is to that extent void.
+ Exception 1 :  Saving of agreement not to carry on business
+
+of which goodwill is sold-One who sells the goodwill of a business may agree
+
+with the buyer to refrain from carrying on a similar business, within specified
+
+local limits, so long as the buyer, or any person deriving title to the
+
+goodwill from him, carries on a like business therein, provided that such
+
+limits appear to the court reasonable, regard being had to the nature of the
+
+business.
+
+Act: Securities Contracts (Regulation) Act, 1956
+Section: 27
+Text: Securities Contracts (Regulation) Act, 1956
+
+27.Title to dividends.-
+(1) It shall be lawful
+
+for the holder of any security whose name appears on the books of the company
+
+issuing the said security to receive and retain any dividend declared by the
+
+company in respect thereof for any year, notwithstanding that the said security
+
+has already been transferred by him for consideration, unless the transferee
+
+who claims the dividend from the transferor has lodged the security and all
+
+other documents relating to the transfer which may be required by the company
+
+with the company for being registered in his name within fifteen days of the
+
+date on which the dividend became due.
+Explanation.- The period specified in this section shall be extended-
+(i) in case of death
+
+of the transferee, by the actual period taken by his legal representative to
+
+establish his claim to the dividend;
+(ii) in case of loss
+
+of transfer deed by theft or any other cause beyond the control of the
+
+transferee, by the actual period taken for the replacement thereof; and
+(iii) in case of delay
+
+in the lodging of any security and other documents relating to the transfer due
+
+to causes connected with the post, by the actual period of the delay.
+(2) Nothing contained
+
+in sub-section (1) shall affect-
+(a)
+
+the right of a company to pay the dividend which has become due to any person
+
+whose name is for the time being registered in the books of the company as the
+
+holder of the security in respect of which the dividend has become due; or
+(b)
+
+the right of the transferee of any security to enforce against the transferor or
+
+any other person his rights, if any, in relation to the transfer in any case,
+
+where the company has refused to register the transfer of the security in the
+
+name of the transferee.

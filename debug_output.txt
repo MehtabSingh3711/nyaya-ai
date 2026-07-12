@@ -1,0 +1,148 @@
+=== Clause 7 Title: other ===
+=== Clause 7 Text ===
+7. Restrictive Covenants
+The Employee acknowledges access to valuable confidential information and agrees that, for a
+period of twenty-four (24) months following termination of employment for any reason, the
+Employee shall not, directly or indirectly, accept employment with, provide services to, consult for,
+establish, finance, or otherwise participate in any competing business operating anywhere within
+India where such activities are similar to those performed for the Employer.
+
+=== Retrieved Chunks (5) ===
+
+[1] Score: 0.6646
+Act: Real Estate (Regulation and Development) Act, 2016
+Section: 27
+Text: 27. Restrictions on Chairperson or Members on employment after cessation of office.-
+(1) The Chairperson or a Member, ceasing to hold office as such, shall not-
+(a) accept any employment in, or connected with, the management or administration of, any person or organisation which has been associated with any work under this Act, from the date on which he ceases to hold office: Provided that nothing contained in this clause shall apply to any employment under the appropriate Government or a local authority or in any statutory authority or any corporation established by or under any Central, State or provincial Act or a Government Company, as defined under clause (45) of section 2 of the Companies Act, 2013 (18 of 2013), which is not a promoter as per the provisions of this Act;
+(b) act, for or on behalf of any person or organisation in connection with any specific proceeding or transaction or negotiation or a case to which the Authority is a party and with respect to which the Chairperson or such Member had, before cessation of office, acted for or provided advice to the Authority;
+(c) give advice to any person using information which was obtained in his capacity as the Chairperson or a Member and being unavailable to or not being able to be made available to the public;
+(d) enter into a contract of service with, or accept an appointment to a board of directors of, or accept an offer of employment with, an entity with which he had direct and significant official dealings during his term of office as such.
+(2) The Chairperson and Members shall not communicate or reveal to any person any matter which has been brought under his consideration or known to him while acting as such.
+
+[2] Score: 0.6414
+Act: Delhi School Education Act, 1973
+Section: 8
+Text: 8. Terms and conditions of service of employees of recognised private schools.-
+(1) The Administrator may make rules regulating the minimum qualifications for recruitment, and the conditions of service, of employees of recognised private schools:
+Provided that neither the salary nor the rights in respect of leave of absence, age of retirement and pension of an employee in the employment of an existing school at the commencement of this Act shall be varied to the disadvantage of such employee:
+Provided further that every such employee shall be entitled to opt for terms and conditions of service as they were applicable to him immediately before the commencement of this Act.
+(2) Subject to any rule that may be made in this behalf, no employee of a recognised private school shall be dismissed, removed or reduced in rank nor shall his service be otherwise terminated except with the prior approval of the Director.
+(3) Any employee of a recognised private school who is dismissed, removed or reduced in rank may, within three months from the date of communication to him of the order of such dismissal, removal or reduction in rank, appeal against such order to the Tribunal constituted under section 11.
+(4) Where the managing committee of a recognised private school intends to suspend any of its employees, such intention shall be communicated to the Director and no such suspension shall be made except with the prior approval of the Director:
+Provided that the managing committee may suspend an employee with immediate effect and without the prior approval of the Director if it is satisfied that such immediate suspension is necessary by reason of the gross misconduct, within the meaning of the Code of Conduct prescribed under section 9, of the employee:
+Provided further that no such immediate suspension shall remain in force for more than a period of fifteen days from the date of suspension unless it has been communicated to the Director and approved by him before the expiry of the said period.
+(5) Where the intention to suspend, or the immediate suspension of, an employee is communicated to the Director, he may, if he is satisfied that there are adequate and reasonable grounds for such suspension, accord his approval to such suspension.
+
+[3] Score: 0.6385
+Act: Competition Act, 2002
+Section: 12
+Text: The Competition Act, 2002 
+12. Restriction on
+
+employment of Chairperson and other Members in certain cases.-
+The Chairperson and
+
+other Members shall not, for a period of one year from the date on which they
+
+cease to hold office, accept any employment in, or connected with the management
+
+or administration of, any enterprise which has been a party to a proceeding
+
+before the Commission under this Act: Provided that nothing contained in this
+
+section shall apply to any employment under the Central Government or a State
+
+Government or local authority or in any statutory authority or any corporation
+
+established by or under any Central, State or Provincial ct or a Government
+
+company as defined in section 617 of the Companies Act, 1956 (1 of 1956).
+
+[4] Score: 0.6347
+Act: Companies Act, 2013
+Section: 243
+Text: Companies Act, 2013 
+243.
+
+  Consequence
+
+of termination or modification of certain agreements.
+1.      Where an order made
+
+under section 242 terminates, sets aside or modifies an agreement such as is
+
+referred to in sub-section (2 ) of that section,—
+a.     
+
+  such
+
+order shall not give rise to any claims whatever against the company by any
+
+person for damages or for compensation for loss of office or in any other
+
+respect either in pursuance of the agreement or otherwise;
+b.    
+
+  no
+
+managing director or other director or manager whose agreement is so terminated
+
+or set aside shall, for a period of five years from the date of the order 
+
+terminating or setting aside the agreement, without the leave of the Tribunal,
+
+be appointed, or act, as the managing director or other director or manager of
+
+the company:
+Provided
+
+that the Tribunal shall not grant leave under this clause unless notice of the
+
+intention to apply for leave has been served on the Central Government and that
+
+Government has been given a reasonable opportunity of being heard in the
+
+matter.
+2.      Any person who
+
+knowingly acts as a managing director or other director or manager of a company
+
+in contravention of clause (b ) of sub-section (1 ), and every
+
+other director of the company who is knowingly a party to such contravention,
+
+shall be punishable with imprisonment for a term which may extend to six months
+
+or with fine which may extend to five lakh rupees, or with both.
+
+[5] Score: 0.6333
+Act: Prevention of Corruption Act, 1988
+Section: 11
+Text: Prevention of Corruption Act, 1988
+11. Public servant obtaining valuable thing,
+
+without consideration from person concerned in proceeding or business
+
+transacted by such public servant
+Whoever, being a public servant, accepts or
+
+obtains or agrees to accept or attempts to obtain for himself, or for any other
+
+person, any valuable thing without consideration, or for a consideration which
+
+he knows to be inadequate, from any person whom he knows to have been, or to
+
+be, or to be likely to be concerned in any proceeding or business transacted or
+
+about to be transacted by such public servant, or having any connection with
+
+the official functions of himself or of any public servant to whom he is
+
+subordinate, or from any person whom he knows to be interested in or related to
+
+the person so concerned, shall be punishable with imprisonment for a term which
+
+shall be not less than six months but which may extend to five years and shall
+
+also be liable to fine.

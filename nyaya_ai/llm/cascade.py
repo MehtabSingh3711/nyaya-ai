@@ -35,8 +35,9 @@ from nyaya_ai.config import (
     OPENROUTER_BASE_URL,
     OPENROUTER_MODEL,
 )
-from nyaya_ai.llm.prompts import build_system_prompt
-from nyaya_ai.schemas import CitedAnswer
+from pydantic import BaseModel
+from nyaya_ai.llm.prompts import build_system_prompt, build_risk_assessment_prompt
+from nyaya_ai.schemas import CitedAnswer, RiskAssessment
 
 console = Console()
 
@@ -273,8 +274,8 @@ def _extract_json(raw: str) -> str:
     raise ValueError(f"Unbalanced braces in LLM response: {raw[:200]}")
 
 
-def _parse_response(raw: str) -> CitedAnswer:
-    """Parse and validate the raw LLM response into a CitedAnswer.
+def _parse_response(raw: str, schema_cls: type[BaseModel] = CitedAnswer) -> BaseModel:
+    """Parse and validate the raw LLM response into schema_cls.
 
     Extracts JSON from noisy output before validating with Pydantic.
 
@@ -282,7 +283,7 @@ def _parse_response(raw: str) -> CitedAnswer:
         ValueError: If the response is not valid JSON or fails Pydantic validation.
     """
     cleaned = _extract_json(raw)
-    return CitedAnswer.model_validate_json(cleaned)
+    return schema_cls.model_validate_json(cleaned)
 
 
 def _make_fallback(reason: str) -> CitedAnswer:
@@ -296,8 +297,8 @@ def _make_fallback(reason: str) -> CitedAnswer:
 
 
 # ===================================================================
-# Cascade orchestrator
-# ===================================================================
+# Circuit breaker to dynamically skip rate-limited or offline tiers during a batch scan
+_DISABLED_TIERS: set[str] = set()
 
 
 def _try_tier(
@@ -307,26 +308,32 @@ def _try_tier(
     question: str,
     context_str: str,
     system_prompt: str,
-) -> CitedAnswer | None:
-    """Attempt a single tier with retries. Returns CitedAnswer or None to escalate."""
+    schema_cls: type[BaseModel] = CitedAnswer,
+) -> BaseModel | None:
+    """Attempt a single tier with retries. Returns parsed model or None to escalate."""
+    if tier_name in _DISABLED_TIERS:
+        console.print(f"[yellow]  Skipping {tier_name} (circuit breaker active due to rate limit/connection error)[/]")
+        return None
 
     # First call
     try:
         raw = call_fn(question, context_str, system_prompt)
-    except ConnectionError as e:
-        console.print(f"[red]  {tier_name} connection failed: {e}[/]")
-        return None
     except Exception as e:
-        console.print(f"[red]  {tier_name} unexpected error: {e}[/]")
+        err_str = str(e).lower()
+        if "rate limit" in err_str or "429" in err_str or isinstance(e, (ConnectionError, ConnectionRefusedError)):
+            console.print(f"[red]  {tier_name} rate limited or offline: {e}. Activating circuit breaker.[/]")
+            _DISABLED_TIERS.add(tier_name)
+        else:
+            console.print(f"[red]  {tier_name} unexpected error: {e}[/]")
         return None
 
     # Parse + validate with retries
     for attempt in range(1 + MAX_RETRIES):
         try:
-            answer = _parse_response(raw)
+            answer = _parse_response(raw, schema_cls)
 
             # Confidence threshold — cite-or-refuse
-            if answer.confidence < CONFIDENCE_THRESHOLD:
+            if schema_cls is CitedAnswer and answer.confidence < CONFIDENCE_THRESHOLD:
                 answer.can_answer = False
 
             console.print(f"[green]  ✓ Answered by {tier_name} ({tier_label})[/]")
@@ -341,8 +348,13 @@ def _try_tier(
                 # Retry: call the LLM again
                 try:
                     raw = call_fn(question, context_str, system_prompt)
-                except (ConnectionError, Exception) as retry_err:
-                    console.print(f"[red]  {tier_name} retry failed: {retry_err}[/]")
+                except Exception as retry_err:
+                    retry_err_str = str(retry_err).lower()
+                    if "rate limit" in retry_err_str or "429" in retry_err_str or isinstance(retry_err, (ConnectionError, ConnectionRefusedError)):
+                        console.print(f"[red]  {tier_name} retry rate limited or offline: {retry_err}. Activating circuit breaker.[/]")
+                        _DISABLED_TIERS.add(tier_name)
+                    else:
+                        console.print(f"[red]  {tier_name} retry failed: {retry_err}[/]")
                     return None
             else:
                 console.print(
@@ -416,5 +428,88 @@ def cascade_query(
     return _make_fallback(
         "Unable to get a valid response from any language model. "
         "Please try rephrasing your question."
+    )
+
+
+def _make_risk_fallback(clause_type: str, reason: str) -> RiskAssessment:
+    """Create a default no-risk response on total cascade failure."""
+    return RiskAssessment(
+        risk_level="none",
+        explanation=f"Cascade failed to run risk assessment: {reason}",
+        confidence=0.0,
+        clause_type=clause_type,
+    )
+
+
+def cascade_risk_assessment(
+    clause_text: str,
+    context_chunks: list[dict],
+    best_guess_type: str,
+) -> RiskAssessment:
+    """Run the 3-tier LLM cascade to assess contract clause risks.
+
+    Escalation: Groq → Gemini → OpenRouter → fallback.
+
+    Args:
+        clause_text: Verbatim contract clause.
+        context_chunks: List of payload dicts from Qdrant search.
+        best_guess_type: The local best-guess clause type.
+
+    Returns:
+        A validated RiskAssessment model.
+    """
+    system_prompt = build_risk_assessment_prompt()
+    context_str = _format_context(context_chunks)
+
+    # Custom question parameter formatted for the generic prompt
+    question = (
+        f"Clause to Analyze:\n{clause_text}\n\n"
+        f"Local Best-Guess Clause Type: {best_guess_type}"
+    )
+
+    # -------------------------------------------------------------------
+    # Tier 1 — Groq
+    # -------------------------------------------------------------------
+    console.print("[dim]  Trying Tier 1 (Groq / Llama 3.3 70B)...[/]")
+    result = _try_tier(
+        "Tier 1", _call_groq, "Groq / Llama 3.3 70B",
+        question, context_str, system_prompt,
+        schema_cls=RiskAssessment,
+    )
+    if result is not None:
+        return result
+    console.print("[yellow]  Tier 1 failed — escalating...[/]")
+
+    # -------------------------------------------------------------------
+    # Tier 2 — Gemini
+    # -------------------------------------------------------------------
+    console.print("[dim]  Trying Tier 2 (Gemini 2.0 Flash)...[/]")
+    result = _try_tier(
+        "Tier 2", _call_gemini, "Gemini 2.0 Flash",
+        question, context_str, system_prompt,
+        schema_cls=RiskAssessment,
+    )
+    if result is not None:
+        return result
+    console.print("[yellow]  Tier 2 failed — escalating...[/]")
+
+    # -------------------------------------------------------------------
+    # Tier 3 — OpenRouter
+    # -------------------------------------------------------------------
+    console.print("[dim]  Trying Tier 3 (OpenRouter)...[/]")
+    result = _try_tier(
+        "Tier 3", _call_openrouter, "OpenRouter",
+        question, context_str, system_prompt,
+        schema_cls=RiskAssessment,
+    )
+    if result is not None:
+        return result
+    console.print("[yellow]  Tier 3 failed.[/]")
+
+    # All tiers exhausted
+    console.print("[red]  All 3 tiers exhausted for risk assessment.[/]")
+    return _make_risk_fallback(
+        best_guess_type,
+        "Unable to get a valid response from any language model."
     )
 
