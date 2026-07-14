@@ -3,14 +3,19 @@
 Interactive terminal chat against the statutory corpus in Qdrant.
 Type a legal question, get a cited answer backed by Indian law.
 
+Pipeline:
+    1. Embed query (BGE-M3 dense + sparse)
+    2. Hybrid search (dense + sparse, RRF fusion) → top-20 candidates
+    3. Cross-encoder rerank (bge-reranker-v2-m3) → top-5
+    4. LLM cascade → cited answer
+
 Usage:
     python ingest.py           # Run once to populate the corpus
     python query.py            # Start the chat REPL
 
 Requires:
-    - Qdrant running (docker compose up -d)
-    - Ollama running with phi3:3.8b (ollama serve)
-    - nyaya_corpus populated via ingest.py
+    - Qdrant data at ./qdrant_data (populated via ingest.py)
+    - API keys in .env (GROQ_API_KEY, etc.)
 """
 
 from __future__ import annotations
@@ -24,9 +29,10 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.theme import Theme
 
-from nyaya_ai.config import COLLECTION_NAME, TOP_K
+from nyaya_ai.config import COLLECTION_NAME, RERANK_CANDIDATES, FINAL_TOP_K
 from nyaya_ai.llm.cascade import cascade_query
 from nyaya_ai.retrieval.embedder import Embedder
+from nyaya_ai.retrieval.reranker import Reranker
 from nyaya_ai.store.qdrant import get_point_count, search
 
 # Custom theme for consistent styling
@@ -60,6 +66,9 @@ def _print_banner() -> None:
         banner.append(f" ({count:,} sections indexed)\n", style="dim")
     except ConnectionError:
         banner.append(" (could not reach Qdrant)\n", style="red")
+
+    banner.append("   Pipeline: ", style="dim")
+    banner.append("hybrid (dense+sparse) → rerank → cascade\n", style="cyan")
 
     banner.append("\n   Type your legal question. Type ", style="dim")
     banner.append("quit", style="bold")
@@ -173,6 +182,13 @@ def main() -> None:
         console.print(f"\n[red bold]ERROR:[/] Failed to load embedding model: {e}")
         sys.exit(1)
 
+    # Load reranker (downloads bge-reranker-v2-m3 on first run)
+    try:
+        reranker = Reranker()
+    except Exception as e:
+        console.print(f"\n[red bold]ERROR:[/] Failed to load reranker: {e}")
+        sys.exit(1)
+
     # ------------------------------------------------------------------
     # Banner
     # ------------------------------------------------------------------
@@ -200,16 +216,20 @@ def main() -> None:
             break
 
         # Process the question
-        console.print("[dim]  Searching corpus...[/]")
+        console.print("[dim]  Searching corpus (hybrid)...[/]")
         start = time.time()
 
-        # Step 1: Embed the question
-        query_vector = embedder.embed_query(question)
+        # Step 1: Embed the question (dense + sparse)
+        query_hybrid = embedder.embed_query_hybrid(question)
 
-        # Step 2: Search Qdrant
-        context_chunks = search(query_vector=query_vector, top_k=TOP_K)
+        # Step 2: Hybrid search (dense + sparse, RRF fusion) → top-20
+        candidates = search(
+            query_vector=query_hybrid.dense,
+            sparse_vector=query_hybrid.sparse,
+            top_k=RERANK_CANDIDATES,
+        )
 
-        if not context_chunks:
+        if not candidates:
             console.print(
                 Panel(
                     "[yellow]No relevant sections found in the corpus. "
@@ -220,14 +240,22 @@ def main() -> None:
             )
             continue
 
-        # Step 3: LLM cascade
+        # Step 3: Cross-encoder rerank → top-5
+        console.print("[dim]  Reranking candidates...[/]")
+        context_chunks = reranker.rerank(
+            query=question,
+            candidates=candidates,
+            top_k=FINAL_TOP_K,
+        )
+
+        # Step 4: LLM cascade
         console.print("[dim]  Generating answer...[/]")
         result = cascade_query(question, context_chunks)
 
         elapsed = time.time() - start
         console.print(f"[dim]  ({elapsed:.1f}s)[/]")
 
-        # Step 4: Display
+        # Step 5: Display
         _display_answer(result, context_chunks)
 
 

@@ -1,46 +1,65 @@
-"""Tests for nyaya_ai.retrieval.embedder — BGE-M3 wrapper.
+"""Tests for nyaya_ai.retrieval.embedder — BGE-M3 hybrid wrapper.
 
-All tests mock the SentenceTransformer model — no actual model download.
+All tests mock the BGEM3FlagModel — no actual model download.
+Tests cover dense-only, sparse-only, and hybrid (dense + sparse) methods.
 """
 
 import numpy as np
 import pytest
 from unittest.mock import MagicMock, patch
 
-from nyaya_ai.retrieval.embedder import Embedder
+from nyaya_ai.retrieval.embedder import Embedder, HybridVectors, HybridQueryVectors
 
 
 @pytest.fixture
 def mock_embedder():
-    """Create an Embedder with a mocked SentenceTransformer."""
-    with patch("sentence_transformers.SentenceTransformer") as MockST:
+    """Create an Embedder with a mocked BGEM3FlagModel."""
+    with patch("FlagEmbedding.BGEM3FlagModel") as MockBGE:
         mock_model = MagicMock()
+        mock_tokenizer = MagicMock()
 
-        # embed_documents: batch of 2 texts → 2 vectors of dim 1024, normalized
-        def mock_encode(texts, normalize_embeddings=True, show_progress_bar=False, batch_size=32):
-            if isinstance(texts, str):
-                # Single text (embed_query path)
-                vec = np.random.randn(1024).astype(np.float32)
-                if normalize_embeddings:
-                    vec = vec / np.linalg.norm(vec)
-                return vec
-            else:
-                # Batch (embed_documents path)
-                vecs = np.random.randn(len(texts), 1024).astype(np.float32)
-                if normalize_embeddings:
-                    norms = np.linalg.norm(vecs, axis=1, keepdims=True)
-                    vecs = vecs / norms
-                return vecs
+        # Mock tokenizer for sparse token conversion
+        mock_tokenizer.convert_tokens_to_ids.side_effect = lambda tokens: [
+            hash(t) % 30000 for t in tokens
+        ]
+        mock_model.tokenizer = mock_tokenizer
+
+        def mock_encode(
+            texts,
+            batch_size=32,
+            return_dense=True,
+            return_sparse=False,
+            return_colbert_vecs=False,
+        ):
+            n = len(texts) if isinstance(texts, list) else 1
+            result = {}
+
+            if return_dense:
+                vecs = np.random.randn(n, 1024).astype(np.float32)
+                norms = np.linalg.norm(vecs, axis=1, keepdims=True)
+                vecs = vecs / norms
+                result["dense_vecs"] = vecs
+
+            if return_sparse:
+                # Simulate lexical weights as {token_string: weight}
+                result["lexical_weights"] = [
+                    {"agreement": 0.8, "restraint": 0.6, "void": 0.4}
+                    for _ in range(n)
+                ]
+
+            return result
 
         mock_model.encode = mock_encode
-        MockST.return_value = mock_model
+        MockBGE.return_value = mock_model
 
-        embedder = Embedder()
+        embedder = Embedder.__new__(Embedder)
+        embedder._model = mock_model
+
         yield embedder
 
 
-class TestEmbedder:
-    """Embedder — BGE-M3 wrapper tests."""
+class TestEmbedderDense:
+    """Dense-only embedding tests (backward compatible)."""
 
     def test_embed_documents_returns_correct_count(self, mock_embedder):
         texts = ["text one", "text two", "text three"]
@@ -62,7 +81,7 @@ class TestEmbedder:
         vectors = mock_embedder.embed_documents(["test text"])
         vec = np.array(vectors[0])
         norm = np.linalg.norm(vec)
-        assert abs(norm - 1.0) < 0.01  # approximately unit length
+        assert abs(norm - 1.0) < 0.01
 
     def test_embed_query_returns_1024_dims(self, mock_embedder):
         vector = mock_embedder.embed_query("what is section 27?")
@@ -81,3 +100,51 @@ class TestEmbedder:
     def test_embed_empty_batch(self, mock_embedder):
         vectors = mock_embedder.embed_documents([])
         assert len(vectors) == 0
+
+
+class TestEmbedderHybrid:
+    """Hybrid (dense + sparse) embedding tests."""
+
+    def test_hybrid_documents_returns_named_tuple(self, mock_embedder):
+        result = mock_embedder.embed_documents_hybrid(["text"])
+        assert isinstance(result, HybridVectors)
+        assert hasattr(result, "dense")
+        assert hasattr(result, "sparse")
+
+    def test_hybrid_documents_dense_shape(self, mock_embedder):
+        result = mock_embedder.embed_documents_hybrid(["text 1", "text 2"])
+        assert len(result.dense) == 2
+        assert len(result.dense[0]) == 1024
+
+    def test_hybrid_documents_sparse_shape(self, mock_embedder):
+        result = mock_embedder.embed_documents_hybrid(["text 1", "text 2"])
+        assert len(result.sparse) == 2
+        # Each sparse dict should have int keys and float values
+        for sparse_dict in result.sparse:
+            assert isinstance(sparse_dict, dict)
+            for key, value in sparse_dict.items():
+                assert isinstance(key, int)
+                assert isinstance(value, float)
+
+    def test_hybrid_query_returns_named_tuple(self, mock_embedder):
+        result = mock_embedder.embed_query_hybrid("test query")
+        assert isinstance(result, HybridQueryVectors)
+        assert hasattr(result, "dense")
+        assert hasattr(result, "sparse")
+
+    def test_hybrid_query_dense_is_single_vector(self, mock_embedder):
+        result = mock_embedder.embed_query_hybrid("test query")
+        assert len(result.dense) == 1024
+        assert isinstance(result.dense, list)
+
+    def test_hybrid_query_sparse_is_dict(self, mock_embedder):
+        result = mock_embedder.embed_query_hybrid("test query")
+        assert isinstance(result.sparse, dict)
+        for key, value in result.sparse.items():
+            assert isinstance(key, int)
+            assert isinstance(value, float)
+
+    def test_hybrid_query_sparse_has_entries(self, mock_embedder):
+        """Sparse vector should have at least some non-zero entries."""
+        result = mock_embedder.embed_query_hybrid("test query")
+        assert len(result.sparse) > 0

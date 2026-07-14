@@ -1,6 +1,7 @@
-"""Tests for nyaya_ai.store.qdrant — Qdrant collection management.
+"""Tests for nyaya_ai.store.qdrant — Qdrant collection management (hybrid).
 
 All tests mock the QdrantClient — no real Qdrant instance required.
+Tests cover both hybrid (dense + sparse) and dense-only fallback paths.
 """
 
 import pytest
@@ -54,8 +55,8 @@ class TestCreateCollection:
         create_collection()
         mock_client.create_collection.assert_not_called()
 
-    def test_vector_config_is_correct(self, mock_client):
-        """Verify the vector config passed to create_collection is correct."""
+    def test_vector_config_has_dense(self, mock_client):
+        """Verify the vector config includes dense named vector."""
         mock_client.get_collections.return_value = SimpleNamespace(collections=[])
         create_collection()
 
@@ -63,6 +64,15 @@ class TestCreateCollection:
         assert call_kwargs.kwargs["collection_name"] == "nyaya_corpus"
         vectors_config = call_kwargs.kwargs["vectors_config"]
         assert "dense" in vectors_config
+
+    def test_sparse_vector_config_present(self, mock_client):
+        """Verify the collection is created with sparse vector config."""
+        mock_client.get_collections.return_value = SimpleNamespace(collections=[])
+        create_collection()
+
+        call_kwargs = mock_client.create_collection.call_args
+        sparse_config = call_kwargs.kwargs.get("sparse_vectors_config", {})
+        assert "sparse" in sparse_config
 
 
 # ===================================================================
@@ -78,7 +88,8 @@ class TestUpsertChunks:
         # Should call upsert once (5 < batch_size of 100)
         mock_client.upsert.assert_called_once()
 
-    def test_payload_structure(self, mock_client):
+    def test_payload_structure_dense_only(self, mock_client):
+        """When no sparse vectors provided, only dense vector is stored."""
         chunk = _make_chunk()
         vector = [[0.1] * 1024]
         upsert_chunks([chunk], vector)
@@ -89,15 +100,42 @@ class TestUpsertChunks:
 
         point = points[0]
         assert "dense" in point.vector
+        assert "sparse" not in point.vector
         assert point.payload["act_name"] == "ICA 1872"
         assert point.payload["section_number"] == "27"
         assert point.payload["source"] == "test"
+
+    def test_payload_structure_with_sparse(self, mock_client):
+        """When sparse vectors provided, both dense and sparse are stored."""
+        chunk = _make_chunk()
+        dense = [[0.1] * 1024]
+        sparse = [{1: 0.5, 5: 0.3, 100: 0.1}]
+        upsert_chunks([chunk], dense, sparse_vectors=sparse)
+
+        call_args = mock_client.upsert.call_args
+        points = call_args.kwargs["points"]
+        point = points[0]
+
+        assert "dense" in point.vector
+        assert "sparse" in point.vector
+        # Verify sparse vector structure
+        sv = point.vector["sparse"]
+        assert hasattr(sv, "indices")
+        assert hasattr(sv, "values")
 
     def test_mismatched_lengths_raises(self, mock_client):
         chunks = [_make_chunk()]
         vectors = [[0.1] * 1024, [0.2] * 1024]  # 2 vectors but 1 chunk
         with pytest.raises(ValueError, match="same length"):
             upsert_chunks(chunks, vectors)
+
+    def test_mismatched_sparse_lengths_raises(self, mock_client):
+        """Sparse vectors must match chunks length."""
+        chunks = [_make_chunk(), _make_chunk(section="28")]
+        vectors = [[0.1] * 1024, [0.2] * 1024]
+        sparse = [{1: 0.5}]  # Only 1 sparse but 2 chunks
+        with pytest.raises(ValueError, match="same length"):
+            upsert_chunks(chunks, vectors, sparse_vectors=sparse)
 
     def test_empty_chunks_skips(self, mock_client):
         upsert_chunks([], [])
@@ -118,8 +156,8 @@ class TestUpsertChunks:
 
 class TestSearch:
 
-    def test_returns_results_with_score(self, mock_client):
-        """Search results should include payload fields plus a 'score' field."""
+    def test_dense_only_search(self, mock_client):
+        """When no sparse_vector, falls back to dense-only search."""
         mock_point = SimpleNamespace(
             payload={"act_name": "ICA 1872", "section_number": "27", "text": "..."},
             score=0.92,
@@ -130,6 +168,32 @@ class TestSearch:
         assert len(results) == 1
         assert results[0]["act_name"] == "ICA 1872"
         assert results[0]["score"] == 0.92
+
+        # Verify dense-only path (no prefetch)
+        call_kwargs = mock_client.query_points.call_args.kwargs
+        assert "prefetch" not in call_kwargs or call_kwargs.get("prefetch") is None
+
+    def test_hybrid_search_with_sparse(self, mock_client):
+        """When sparse_vector provided, uses prefetch + RRF fusion."""
+        mock_point = SimpleNamespace(
+            payload={"act_name": "MSME Act", "section_number": "15", "text": "..."},
+            score=0.85,
+        )
+        mock_client.query_points.return_value = SimpleNamespace(points=[mock_point])
+
+        sparse = {1: 0.5, 10: 0.3}
+        results = search(
+            query_vector=[0.1] * 1024,
+            top_k=5,
+            sparse_vector=sparse,
+        )
+        assert len(results) == 1
+        assert results[0]["act_name"] == "MSME Act"
+
+        # Verify hybrid path (prefetch present)
+        call_kwargs = mock_client.query_points.call_args.kwargs
+        assert call_kwargs.get("prefetch") is not None
+        assert len(call_kwargs["prefetch"]) == 2  # dense + sparse prefetch
 
     def test_empty_results(self, mock_client):
         mock_client.query_points.return_value = SimpleNamespace(points=[])
@@ -198,4 +262,3 @@ class TestCollectionParameterization:
         mock_client.get_collection.return_value = SimpleNamespace(points_count=10)
         assert get_point_count("custom_col") == 10
         mock_client.get_collection.assert_called_once_with(collection_name="custom_col")
-

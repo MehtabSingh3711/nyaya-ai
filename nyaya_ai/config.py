@@ -15,9 +15,18 @@ COLLECTION_NAME = "nyaya_corpus"
 
 # ---------------------------------------------------------------------------
 # Embedding — BGE-M3 (ADR-002)
+# Dense (1024-dim) + sparse (lexical weights) in one forward pass
+# via FlagEmbedding's BGEM3FlagModel
 # ---------------------------------------------------------------------------
 EMBEDDING_MODEL = "BAAI/bge-m3"
 EMBEDDING_DIM = 1024
+
+# ---------------------------------------------------------------------------
+# Reranking — Cross-encoder (ADR-002)
+# bge-reranker-v2-m3: multilingual, outperforms base/large on BEIR,
+# relevant for mixed English-Hindi Indian legal text
+# ---------------------------------------------------------------------------
+RERANKER_MODEL = "BAAI/bge-reranker-v2-m3"
 
 # ---------------------------------------------------------------------------
 # LLM — 3-Tier Cloud Cascade (ADR-004)
@@ -53,9 +62,14 @@ CONFIDENCE_THRESHOLD = 0.7
 MAX_RETRIES = 1          # retries at same tier before escalation
 
 # ---------------------------------------------------------------------------
-# Retrieval
+# Retrieval — Hybrid pipeline (ADR-002, ADR-003, ADR-011)
+# Stage 1: Hybrid search (dense + sparse, RRF fusion) → RERANK_CANDIDATES
+# Stage 2: Cross-encoder rerank → FINAL_TOP_K
+# Stage 3: Pass to LLM cascade
 # ---------------------------------------------------------------------------
-TOP_K = 5                # chunks passed to LLM after retrieval
+RERANK_CANDIDATES = 20   # candidates fetched from hybrid search (pre-rerank)
+FINAL_TOP_K = 5          # chunks passed to LLM after reranking
+TOP_K = 5                # backward compat alias for FINAL_TOP_K
 
 # ---------------------------------------------------------------------------
 # Corpus versioning
@@ -81,4 +95,4 @@ MIN_CHUNK_TOKENS = 50     # merge sections shorter than this
 # Contract Intelligence (Mode 1)
 # ---------------------------------------------------------------------------
 CONTRACT_RELEVANCE_THRESHOLD = 0.50
-CONTRACT_RISK_TOP_K = 10
+CONTRACT_RISK_TOP_K = 15

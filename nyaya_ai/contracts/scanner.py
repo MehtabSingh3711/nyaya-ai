@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
-from nyaya_ai.config import CONTRACT_RELEVANCE_THRESHOLD, CONTRACT_RISK_TOP_K
+from nyaya_ai.config import (
+    CONTRACT_RELEVANCE_THRESHOLD,
+    CONTRACT_RISK_TOP_K,
+    RERANK_CANDIDATES,
+)
 from nyaya_ai.contracts.extractor import extract_contract_text
 from nyaya_ai.contracts.chunker import chunk_contract
 from nyaya_ai.contracts.classifier import classify_clause
@@ -10,6 +14,7 @@ from nyaya_ai.llm.cascade import cascade_risk_assessment
 from nyaya_ai.schemas import ContractScanResult, RiskFinding, RiskAssessment
 from nyaya_ai.store import qdrant
 from nyaya_ai.retrieval.embedder import Embedder
+from nyaya_ai.retrieval.reranker import Reranker
 
 
 def normalize_text(text: str) -> str:
@@ -125,6 +130,7 @@ def scan_contract(
         )
 
     embedder = Embedder()
+    reranker = Reranker()
 
     # 3. Index clauses into Qdrant 'nyaya_contracts' collection (ignoring failures)
     try:
@@ -144,10 +150,20 @@ def scan_contract(
     for clause in clauses:
         best_guess_type, best_guess_detail = classify_clause(clause.clause_text)
 
-        # Retrieve applicable law chunks
-        query_vector = embedder.embed_query(clause.clause_text)
-        retrieved_chunks = qdrant.search(
-            query_vector, top_k=top_k, collection_name="nyaya_corpus"
+        # Retrieve applicable law chunks via hybrid search
+        query_hybrid = embedder.embed_query_hybrid(clause.clause_text)
+        candidates = qdrant.search(
+            query_vector=query_hybrid.dense,
+            sparse_vector=query_hybrid.sparse,
+            top_k=RERANK_CANDIDATES,
+            collection_name="nyaya_corpus",
+        )
+
+        # Cross-encoder rerank → top_k best matches
+        retrieved_chunks = reranker.rerank(
+            query=clause.clause_text,
+            candidates=candidates,
+            top_k=top_k,
         )
 
         max_score = max([c["score"] for c in retrieved_chunks]) if retrieved_chunks else 0.0

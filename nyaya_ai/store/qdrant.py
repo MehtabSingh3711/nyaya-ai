@@ -1,7 +1,13 @@
-"""Qdrant vector store management for Nyaya AI (ADR-003).
+"""Qdrant vector store management for Nyaya AI (ADR-003, ADR-011).
 
-Manages the nyaya_corpus collection: creation, upsert, dense search,
-and point count verification. All config read from nyaya_ai.config.
+Manages the nyaya_corpus collection: creation with hybrid named vectors
+(dense + sparse), upsert, hybrid search with RRF fusion, and point count.
+
+Hybrid search pipeline:
+    1. Dense prefetch (BGE-M3 cosine, top-20)
+    2. Sparse prefetch (lexical weights, top-20)
+    3. RRF fusion → combined ranked list
+    4. (Reranking happens at the caller level, not here)
 
 Connection errors are caught and surfaced as clear messages — no silent failures.
 """
@@ -19,7 +25,6 @@ from qdrant_client.http.exceptions import (
 from rich.console import Console
 
 from nyaya_ai.config import COLLECTION_NAME, EMBEDDING_DIM, QDRANT_PATH, QDRANT_URL
-from nyaya_ai.schemas import CorpusChunk, ClauseExtraction
 
 console = Console()
 
@@ -58,7 +63,7 @@ def _get_client() -> QdrantClient:
 
 
 def create_collection(collection_name: str = COLLECTION_NAME) -> None:
-    """Create a collection with dense vector config.
+    """Create a collection with hybrid vector config (dense + sparse).
 
     Idempotent — does nothing if the collection already exists.
     """
@@ -79,14 +84,21 @@ def create_collection(collection_name: str = COLLECTION_NAME) -> None:
                 distance=qmodels.Distance.COSINE,
             ),
         },
+        sparse_vectors_config={
+            "sparse": qmodels.SparseVectorParams(),
+        },
     )
-    console.print(f"[green]Created collection '{collection_name}' (dim={EMBEDDING_DIM}, cosine).[/]")
+    console.print(
+        f"[green]Created collection '{collection_name}' "
+        f"(dense={EMBEDDING_DIM}d cosine + sparse lexical).[/]"
+    )
 
 
 def upsert_chunks(
-    chunks: list[CorpusChunk] | list[ClauseExtraction],
+    chunks: list,
     vectors: list[list[float]],
     collection_name: str = COLLECTION_NAME,
+    sparse_vectors: list[dict[int, float]] | None = None,
 ) -> None:
     """Batch upsert chunks with their embedding vectors.
 
@@ -94,6 +106,8 @@ def upsert_chunks(
         chunks: List of CorpusChunk or ClauseExtraction objects (uses to_payload() for payload).
         vectors: Corresponding list of dense embedding vectors.
         collection_name: Target collection name in Qdrant.
+        sparse_vectors: Optional list of sparse vector dicts ({token_id: weight}).
+                        If None, points are upserted with dense vectors only.
 
     Raises:
         ValueError: If chunks and vectors have different lengths.
@@ -104,20 +118,36 @@ def upsert_chunks(
             f"chunks ({len(chunks)}) and vectors ({len(vectors)}) must have the same length"
         )
 
+    if sparse_vectors is not None and len(chunks) != len(sparse_vectors):
+        raise ValueError(
+            f"chunks ({len(chunks)}) and sparse_vectors ({len(sparse_vectors)}) "
+            f"must have the same length"
+        )
+
     if not chunks:
         console.print("[yellow]No chunks to upsert — skipping.[/]")
         return
 
     client = _get_client()
 
-    points = [
-        qmodels.PointStruct(
-            id=str(uuid.uuid4()),
-            vector={"dense": vector},
-            payload=chunk.to_payload(),
+    points = []
+    for i, (chunk, dense_vec) in enumerate(zip(chunks, vectors)):
+        vector_data: dict = {"dense": dense_vec}
+
+        if sparse_vectors is not None:
+            sv = sparse_vectors[i]
+            vector_data["sparse"] = qmodels.SparseVector(
+                indices=list(sv.keys()),
+                values=list(sv.values()),
+            )
+
+        points.append(
+            qmodels.PointStruct(
+                id=str(uuid.uuid4()),
+                vector=vector_data,
+                payload=chunk.to_payload(),
+            )
         )
-        for chunk, vector in zip(chunks, vectors)
-    ]
 
     # Upsert in batches of 100 to avoid large payloads
     batch_size = 100
@@ -135,29 +165,62 @@ def search(
     query_vector: list[float],
     top_k: int = 5,
     collection_name: str = COLLECTION_NAME,
+    sparse_vector: dict[int, float] | None = None,
 ) -> list[dict]:
-    """Dense cosine search.
+    """Hybrid or dense-only search.
+
+    When sparse_vector is provided, performs hybrid search using Qdrant's
+    prefetch + RRF fusion (dense + sparse). When sparse_vector is None,
+    falls back to dense-only cosine search (backward compatible).
 
     Args:
-        query_vector: The query embedding vector (1024-dim).
+        query_vector: The query dense embedding vector (1024-dim).
         top_k: Number of results to return.
         collection_name: Target collection name in Qdrant.
+        sparse_vector: Optional sparse vector dict ({token_id: weight}).
+                       If provided, enables hybrid search with RRF fusion.
 
     Returns:
         List of dicts, each containing the payload fields plus a 'score' field.
-        Sorted by descending similarity score.
+        Sorted by descending similarity/fusion score.
 
     Raises:
         ConnectionError: If Qdrant is not reachable.
     """
     client = _get_client()
 
-    results = client.query_points(
-        collection_name=collection_name,
-        query=query_vector,
-        using="dense",
-        limit=top_k,
-    )
+    if sparse_vector is not None:
+        # Hybrid search: dense + sparse with RRF fusion
+        sparse_qvec = qmodels.SparseVector(
+            indices=list(sparse_vector.keys()),
+            values=list(sparse_vector.values()),
+        )
+
+        results = client.query_points(
+            collection_name=collection_name,
+            prefetch=[
+                qmodels.Prefetch(
+                    query=query_vector,
+                    using="dense",
+                    limit=top_k,
+                ),
+                qmodels.Prefetch(
+                    query=sparse_qvec,
+                    using="sparse",
+                    limit=top_k,
+                ),
+            ],
+            query=qmodels.FusionQuery(fusion=qmodels.Fusion.RRF),
+            limit=top_k,
+        )
+    else:
+        # Dense-only fallback (backward compatible)
+        results = client.query_points(
+            collection_name=collection_name,
+            query=query_vector,
+            using="dense",
+            limit=top_k,
+        )
 
     hits = []
     for point in results.points:

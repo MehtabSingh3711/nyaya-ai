@@ -1,19 +1,18 @@
-"""Nyaya AI — Statutory Corpus Ingestion Script.
+"""Nyaya AI — Statutory Corpus Ingestion Script (Hybrid).
 
 Ingests Indian legal Acts from HuggingFace datasets into the nyaya_corpus
-Qdrant collection. This is the first step before using query.py for
-Mode 2 (Legal Intelligence Chat).
+Qdrant collection with BOTH dense (BGE-M3) and sparse (lexical weight)
+vectors for hybrid retrieval.
 
 Usage:
-    docker compose up -d        # Start Qdrant
-    python ingest.py            # Run ingestion
+    python ingest.py            # Run ingestion (local or Colab)
 
 Flow:
-    1. Connect to Qdrant (fail fast if down)
-    2. Create nyaya_corpus collection (idempotent)
+    1. Connect to Qdrant (local file-based)
+    2. Create nyaya_corpus collection (dense + sparse named vectors)
     3. Load mratanusarkar/Indian-Laws (primary, pre-sectioned)
     4. Load geekyrakshit/indian-legal-acts (secondary, raw text, dedup-filtered)
-    5. Embed all chunks with BGE-M3
+    5. Embed all chunks with BGE-M3 (dense + sparse in one pass)
     6. Upsert to Qdrant
     7. Print summary
 """
@@ -53,13 +52,13 @@ UPSERT_BATCH_SIZE = 100
 
 
 def main() -> None:
-    """Run the full ingestion pipeline."""
+    """Run the full ingestion pipeline with hybrid encoding."""
     start_time = time.time()
 
     console.print(
         Panel(
-            "[bold white]Nyaya AI — Statutory Corpus Ingestion[/]\n"
-            "Ingesting Indian legal Acts into the vector store.",
+            "[bold white]Nyaya AI — Statutory Corpus Ingestion (Hybrid)[/]\n"
+            "Ingesting Indian legal Acts with dense + sparse vectors.",
             border_style="blue",
         )
     )
@@ -106,12 +105,13 @@ def main() -> None:
     )
 
     # ------------------------------------------------------------------
-    # Step 3: Embed all chunks
+    # Step 3: Embed all chunks (dense + sparse in one pass)
     # ------------------------------------------------------------------
-    console.print("\n[bold]Step 3:[/] Embedding chunks with BGE-M3...\n")
+    console.print("\n[bold]Step 3:[/] Embedding chunks with BGE-M3 (dense + sparse)...\n")
     embedder = Embedder()
 
-    all_vectors: list[list[float]] = []
+    all_dense: list[list[float]] = []
+    all_sparse: list[dict[int, float]] = []
     texts = [c.text for c in all_chunks]
 
     with Progress(
@@ -124,16 +124,20 @@ def main() -> None:
         console=console,
     ) as progress:
         task = progress.add_task(
-            "Embedding...", total=len(texts)
+            "Embedding (hybrid)...", total=len(texts)
         )
 
         for i in range(0, len(texts), EMBED_BATCH_SIZE):
             batch = texts[i : i + EMBED_BATCH_SIZE]
-            batch_vectors = embedder.embed_documents(batch)
-            all_vectors.extend(batch_vectors)
+            hybrid = embedder.embed_documents_hybrid(batch, batch_size=EMBED_BATCH_SIZE)
+            all_dense.extend(hybrid.dense)
+            all_sparse.extend(hybrid.sparse)
             progress.update(task, advance=len(batch))
 
-    console.print(f"[green]  Embedded {len(all_vectors)} chunks.[/]")
+    console.print(
+        f"[green]  Embedded {len(all_dense)} chunks "
+        f"(dense: {EMBEDDING_DIM}d + sparse: lexical weights).[/]"
+    )
 
     # ------------------------------------------------------------------
     # Step 4: Upsert to Qdrant
@@ -154,8 +158,13 @@ def main() -> None:
 
         for i in range(0, len(all_chunks), UPSERT_BATCH_SIZE):
             batch_chunks = all_chunks[i : i + UPSERT_BATCH_SIZE]
-            batch_vectors = all_vectors[i : i + UPSERT_BATCH_SIZE]
-            upsert_chunks(batch_chunks, batch_vectors)
+            batch_dense = all_dense[i : i + UPSERT_BATCH_SIZE]
+            batch_sparse = all_sparse[i : i + UPSERT_BATCH_SIZE]
+            upsert_chunks(
+                batch_chunks,
+                batch_dense,
+                sparse_vectors=batch_sparse,
+            )
             progress.update(task, advance=len(batch_chunks))
 
     # ------------------------------------------------------------------
@@ -174,7 +183,8 @@ def main() -> None:
     table.add_row("  — from geekyrakshit", str(len(secondary_chunks)))
     table.add_row("Unique (act, section) pairs", str(registry.count))
     table.add_row("Total points in Qdrant", str(point_count))
-    table.add_row("Embedding dimension", str(EMBEDDING_DIM))
+    table.add_row("Embedding dimension (dense)", str(EMBEDDING_DIM))
+    table.add_row("Vectors per point", "dense (1024d) + sparse (lexical)")
     table.add_row("Collection", COLLECTION_NAME)
     table.add_row("Time taken", f"{elapsed:.1f}s")
 

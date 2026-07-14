@@ -83,13 +83,24 @@ def test_verify_grounding_quote_mismatch():
 def mock_pipeline():
     with patch("nyaya_ai.contracts.scanner.extract_contract_text") as mock_extract, \
          patch("nyaya_ai.contracts.scanner.Embedder") as mock_embed_cls, \
+         patch("nyaya_ai.contracts.scanner.Reranker") as mock_reranker_cls, \
          patch("nyaya_ai.contracts.scanner.qdrant") as mock_qdrant, \
          patch("nyaya_ai.contracts.scanner.cascade_risk_assessment") as mock_cascade:
         
-        # Setup Embedder
+        # Setup Embedder with hybrid support
         embedder = MagicMock()
         embedder.embed_query.return_value = [0.1] * 1024
+        # Mock hybrid query output
+        hybrid_result = MagicMock()
+        hybrid_result.dense = [0.1] * 1024
+        hybrid_result.sparse = {1: 0.5, 10: 0.3}
+        embedder.embed_query_hybrid.return_value = hybrid_result
         mock_embed_cls.return_value = embedder
+
+        # Setup Reranker — identity rerank (pass through candidates as-is)
+        reranker = MagicMock()
+        reranker.rerank.side_effect = lambda query, candidates, top_k, **kw: candidates[:top_k]
+        mock_reranker_cls.return_value = reranker
         
         yield mock_extract, mock_qdrant, mock_cascade
 
