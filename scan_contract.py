@@ -109,6 +109,12 @@ def main() -> None:
         default=None,
         help="Override default relevance pre-filter threshold (0.0 to 1.0).",
     )
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Print verbose step-by-step diagnostic evaluation logs to the console.",
+    )
 
     args = parser.parse_args()
     contract_path = Path(args.contract_path)
@@ -121,6 +127,8 @@ def main() -> None:
         scan_args = {}
         if args.threshold is not None:
             scan_args["relevance_threshold"] = args.threshold
+        if args.verbose:
+            scan_args["verbose"] = True
 
         result = scan_contract(contract_path, **scan_args)
 

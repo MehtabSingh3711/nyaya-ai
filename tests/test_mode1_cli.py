@@ -1,6 +1,10 @@
-import json
 import sys
 from pathlib import Path
+
+# Add workspace root to sys.path so scan_contract script is resolvable
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+import json
 from unittest.mock import MagicMock, patch
 import pytest
 

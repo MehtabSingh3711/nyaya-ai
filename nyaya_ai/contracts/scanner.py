@@ -86,6 +86,7 @@ def scan_contract(
     *,
     relevance_threshold: float = CONTRACT_RELEVANCE_THRESHOLD,
     top_k: int = CONTRACT_RISK_TOP_K,
+    verbose: bool = False,
 ) -> ContractScanResult:
     """Extract, chunk, retrieve, gate, and assess contract risks.
 
@@ -96,6 +97,7 @@ def scan_contract(
         file_path: Path to the contract file (PDF or DOCX).
         relevance_threshold: Permissive cosine similarity gate.
         top_k: Number of retrieved statute sections from nyaya_corpus.
+        verbose: Print detailed step-by-step evaluation logs to console.
 
     Returns:
         ContractScanResult summary and detailed risk findings.
@@ -147,6 +149,29 @@ def scan_contract(
     llm_scanned_count = 0
     confidence_sum = 0.0
 
+    verbose_logs = []
+    if verbose:
+        from rich.console import Console
+        from rich.table import Table
+        from rich.panel import Panel
+        c_logger = Console()
+        
+        def log_verbose(msg: str):
+            c_logger.print(msg)
+            # Strip simple rich tags for the raw log file
+            import re
+            plain = re.sub(r"\[/?(?:bold|dim|italic|red|green|blue|cyan|magenta|yellow|white|/)[^\]]*?\]", "", msg)
+            verbose_logs.append(plain)
+            
+        log_verbose(
+            f"[bold cyan]Starting Verbose Diagnostic Scan[/]\n"
+            f"Contract: [cyan]{contract_name}[/]\n"
+            f"Clauses Found: [cyan]{len(clauses)}[/]"
+        )
+    else:
+        def log_verbose(msg: str):
+            pass
+
     for clause in clauses:
         best_guess_type, best_guess_detail = classify_clause(clause.clause_text)
 
@@ -166,14 +191,51 @@ def scan_contract(
             top_k=top_k,
         )
 
-        max_score = max([c["score"] for c in retrieved_chunks]) if retrieved_chunks else 0.0
+        # Relevance pre-filter gate (using reranker score)
+        max_score = max([c["rerank_score"] for c in retrieved_chunks]) if retrieved_chunks else 0.0
 
-        # Relevance pre-filter gate
+        if verbose:
+            log_verbose(f"\n[bold blue]Evaluating Clause #{clause.clause_number} (Page {clause.page})[/]")
+            log_verbose(f"[dim]Clause Text:[/] [italic]\"{clause.clause_text.strip()}\"[/]")
+            log_verbose(f"[dim]Classifier Guess:[/] [cyan]{best_guess_type}[/] ({best_guess_detail})")
+            log_verbose(
+                f"Relevance Gate Score (Max Reranker): [bold yellow]{max_score:.4f}[/] "
+                f"(Threshold: {relevance_threshold})"
+            )
+            
+            # Log retrieved candidates in a clean plain format for the file log
+            log_verbose("Top Retrieved Candidates:")
+            for idx, chunk in enumerate(retrieved_chunks, 1):
+                log_verbose(
+                    f"  {idx}. Act: {chunk.get('act_name')} | Sec: {chunk.get('section_number')} | "
+                    f"Rerank Score: {chunk.get('rerank_score', 0.0):.4f}"
+                )
+            
+            # Print table to console only (since Table is a rich object)
+            table = Table(show_header=True, header_style="bold magenta", box=None)
+            table.add_column("Rank", justify="center")
+            table.add_column("Act", justify="left")
+            table.add_column("Section", justify="center")
+            table.add_column("Rerank Score", justify="right")
+            for idx, chunk in enumerate(retrieved_chunks, 1):
+                table.add_row(
+                    str(idx),
+                    chunk.get("act_name", "Unknown"),
+                    chunk.get("section_number", "?"),
+                    f"{chunk.get('rerank_score', 0.0):.4f}",
+                )
+            c_logger.print(table)
+
         if max_score < relevance_threshold:
+            if verbose:
+                log_verbose("[yellow]Gate Result: SKIPPED (Below relevance threshold)[/]")
             # Skip LLM call, record best-guess details
             clause.clause_type = best_guess_type
             clause.clause_type_detail = best_guess_detail
             continue
+
+        if verbose:
+            log_verbose("[green]Gate Result: PASSED[/]")
 
         # Invoke LLM Cascade
         scanned_count += 1
@@ -183,13 +245,29 @@ def scan_contract(
             best_guess_type=best_guess_type,
         )
 
+        if verbose:
+            log_verbose("[bold cyan]Raw LLM Risk Assessment JSON Output:[/]")
+            log_verbose(assessment.model_dump_json(indent=2))
+
         # Update clause with LLM classification
         clause.clause_type = assessment.clause_type
         clause.clause_type_detail = assessment.clause_type_detail
 
         # Grounding verification step
         if assessment.risk_level != "none":
-            if verify_grounding(assessment, retrieved_chunks):
+            grounded = verify_grounding(assessment, retrieved_chunks)
+            if verbose:
+                if grounded:
+                    log_verbose("[bold green]Grounding Verification: PASSED[/]")
+                else:
+                    log_verbose(
+                        f"[bold red]Grounding Verification: REJECTED[/]\n"
+                        f"  Cited Act: '{assessment.conflicting_act}' | Section: '{assessment.conflicting_section}'\n"
+                        f"  Cited Quote: \"{assessment.conflicting_law_quote}\"\n"
+                        f"  Reason: Cited details do not match any retrieved chunks."
+                    )
+            
+            if grounded:
                 finding = RiskFinding(
                     clause_number=clause.clause_number,
                     clause_text=clause.clause_text,
@@ -207,6 +285,8 @@ def scan_contract(
                 confidence_sum += assessment.confidence
                 llm_scanned_count += 1
         else:
+            if verbose:
+                log_verbose("[dim green]Grounding Verification: skipped (no risk found by LLM)[/]")
             confidence_sum += assessment.confidence
             llm_scanned_count += 1
 
@@ -222,6 +302,16 @@ def scan_contract(
     else:
         status = "insufficient_evidence"
         message = "Scan complete. No material risks identified, but retrieval found no relevant Indian laws to evaluate against."
+
+    if verbose:
+        log_verbose(f"\n[bold green]✓ Diagnostic Scan Complete![/] Status: {status.upper()} | Findings: {len(findings)}\n")
+        # Save plain text log to scan_debug.txt
+        try:
+            with open("scan_debug.txt", "w", encoding="utf-8") as f:
+                f.write("\n".join(verbose_logs))
+            c_logger.print("[dim cyan]Detailed log saved to scan_debug.txt[/]")
+        except Exception as e:
+            c_logger.print(f"[red]Failed to save log to scan_debug.txt: {e}[/]")
 
     return ContractScanResult(
         contract_name=contract_name,

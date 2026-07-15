@@ -83,6 +83,15 @@ class CorpusChunk(BaseModel):
     """A single section/article chunk from the statutory corpus.
 
     Used internally during ingestion. Not returned to the user.
+
+    Amendment fields (ADR-012):
+        amendment_status: Tracks whether this section is the original text,
+            has been amended, omitted, or the parent Act repealed.
+        amended_by: Name of the amending Act (e.g. "IT (Amendment) Act, 2008").
+        amendment_year: Year the amendment was enacted.
+        last_verified_source: URL or name of the authoritative source used
+            to verify this text (e.g. "indiacode.nic.in").
+        last_verified_date: ISO date string of when the text was last verified.
     """
 
     act_name: str = Field(
@@ -106,6 +115,36 @@ class CorpusChunk(BaseModel):
     )
     version: str = Field(
         default="v1", description="Corpus version tag"
+    )
+
+    # --- Amendment metadata (ADR-012) ---
+    amendment_status: Literal[
+        "original", "amended", "omitted", "repealed"
+    ] = Field(
+        default="original",
+        description=(
+            "Lifecycle status of this section: "
+            "'original' = unamended text from initial corpus, "
+            "'amended' = text updated by a subsequent amendment Act, "
+            "'omitted' = section removed/omitted by amendment, "
+            "'repealed' = entire parent Act repealed"
+        ),
+    )
+    amended_by: Optional[str] = Field(
+        default=None,
+        description="Name of the amending Act, e.g. 'IT (Amendment) Act, 2008'",
+    )
+    amendment_year: Optional[int] = Field(
+        default=None,
+        description="Year the amendment was enacted",
+    )
+    last_verified_source: Optional[str] = Field(
+        default=None,
+        description="Authoritative source URL or name, e.g. 'indiacode.nic.in'",
+    )
+    last_verified_date: Optional[str] = Field(
+        default=None,
+        description="ISO date (YYYY-MM-DD) when the text was last verified",
     )
 
     def to_payload(self) -> dict:

@@ -3,6 +3,26 @@
 import os
 from dotenv import load_dotenv
 
+# ---------------------------------------------------------------------------
+# Global Progress Bar and Logger Silencing
+# ---------------------------------------------------------------------------
+# Disable Hugging Face download progress bars
+os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
+# Silence HF/tokenizers parallelism warnings
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+# Globally disable tqdm progress bars (used by FastEmbed and sentence-transformers)
+try:
+    import tqdm
+    if not hasattr(tqdm.tqdm, "_original_init"):
+        tqdm.tqdm._original_init = tqdm.tqdm.__init__
+        def safe_tqdm_init(self, *args, **kwargs):
+            kwargs["disable"] = True
+            tqdm.tqdm._original_init(self, *args, **kwargs)
+        tqdm.tqdm.__init__ = safe_tqdm_init
+except ImportError:
+    pass
+
 load_dotenv()
 
 # ---------------------------------------------------------------------------
@@ -11,6 +31,7 @@ load_dotenv()
 # ---------------------------------------------------------------------------
 QDRANT_PATH = "./qdrant_data"    # persistent local storage
 QDRANT_URL = os.getenv("QDRANT_URL", None)  # e.g. "http://localhost:6333" for Docker mode
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY", None)
 COLLECTION_NAME = "nyaya_corpus"
 
 # ---------------------------------------------------------------------------
@@ -23,10 +44,11 @@ EMBEDDING_DIM = 1024
 
 # ---------------------------------------------------------------------------
 # Reranking — Cross-encoder (ADR-002)
-# bge-reranker-v2-m3: multilingual, outperforms base/large on BEIR,
-# relevant for mixed English-Hindi Indian legal text
+# jinaai/jina-reranker-v1-turbo-en: 150MB, 8K context window, Apache 2.0.
+# Selected over BGE-reranker-base due to native 8K context length and
+# faster ONNX CPU inference on local/HF Spaces deployments.
 # ---------------------------------------------------------------------------
-RERANKER_MODEL = "BAAI/bge-reranker-v2-m3"
+RERANKER_MODEL = "jinaai/jina-reranker-v1-turbo-en"
 
 # ---------------------------------------------------------------------------
 # LLM — 3-Tier Cloud Cascade (ADR-004)
@@ -39,7 +61,7 @@ RERANKER_MODEL = "BAAI/bge-reranker-v2-m3"
 # Tier 1 — Groq
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
-GROQ_MODEL = "llama-3.1-8b-instant"
+GROQ_MODEL = "qwen/qwen3-32b"
 
 # Tier 2 — Gemini (via OpenAI-compatible endpoint)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -67,7 +89,7 @@ MAX_RETRIES = 1          # retries at same tier before escalation
 # Stage 2: Cross-encoder rerank → FINAL_TOP_K
 # Stage 3: Pass to LLM cascade
 # ---------------------------------------------------------------------------
-RERANK_CANDIDATES = 20   # candidates fetched from hybrid search (pre-rerank)
+RERANK_CANDIDATES = 100   # candidates fetched from hybrid search (pre-rerank)
 FINAL_TOP_K = 5          # chunks passed to LLM after reranking
 TOP_K = 5                # backward compat alias for FINAL_TOP_K
 
@@ -94,5 +116,5 @@ MIN_CHUNK_TOKENS = 50     # merge sections shorter than this
 # ---------------------------------------------------------------------------
 # Contract Intelligence (Mode 1)
 # ---------------------------------------------------------------------------
-CONTRACT_RELEVANCE_THRESHOLD = 0.50
+CONTRACT_RELEVANCE_THRESHOLD = -0.80
 CONTRACT_RISK_TOP_K = 15

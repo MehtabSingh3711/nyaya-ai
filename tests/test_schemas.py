@@ -253,3 +253,90 @@ class TestCorpusChunk:
             source="dataset_b",
         )
         assert c1.dedup_key == c2.dedup_key
+
+    # ---------------------------------------------------------------
+    # Amendment metadata tests (ADR-012)
+    # ---------------------------------------------------------------
+
+    def test_amendment_status_defaults_to_original(self):
+        """New chunks without explicit amendment_status default to 'original'."""
+        c = CorpusChunk(
+            act_name="ICA 1872",
+            section_number="1",
+            text="Short title.",
+            source="test",
+        )
+        assert c.amendment_status == "original"
+        assert c.amended_by is None
+        assert c.amendment_year is None
+        assert c.last_verified_source is None
+        assert c.last_verified_date is None
+
+    def test_amendment_status_amended(self):
+        c = CorpusChunk(
+            act_name="Information Technology Act 2000",
+            section_number="43A",
+            text="Updated text after 2008 amendment.",
+            source="admin:indiacode.nic.in",
+            amendment_status="amended",
+            amended_by="IT (Amendment) Act, 2008",
+            amendment_year=2008,
+            last_verified_source="indiacode.nic.in",
+            last_verified_date="2026-07-15",
+        )
+        assert c.amendment_status == "amended"
+        assert c.amended_by == "IT (Amendment) Act, 2008"
+        assert c.amendment_year == 2008
+
+    def test_amendment_status_omitted(self):
+        c = CorpusChunk(
+            act_name="Information Technology Act 2000",
+            section_number="66A",
+            text="Section 66A — punishment for sending offensive messages.",
+            source="mratanusarkar/Indian-Laws",
+            amendment_status="omitted",
+            amended_by="Shreya Singhal v. Union of India (2015)",
+            amendment_year=2015,
+        )
+        assert c.amendment_status == "omitted"
+
+    def test_to_payload_includes_amendment_status(self):
+        """amendment_status should always be in payload (it's not None)."""
+        c = CorpusChunk(
+            act_name="ICA 1872",
+            section_number="27",
+            text="Every agreement...",
+            source="test",
+        )
+        payload = c.to_payload()
+        assert payload["amendment_status"] == "original"
+        # Optional None fields should be excluded
+        assert "amended_by" not in payload
+        assert "amendment_year" not in payload
+
+    def test_to_payload_includes_amendment_fields_when_set(self):
+        c = CorpusChunk(
+            act_name="IT Act 2000",
+            section_number="43A",
+            text="Updated section text.",
+            source="admin",
+            amendment_status="amended",
+            amended_by="IT (Amendment) Act, 2008",
+            amendment_year=2008,
+        )
+        payload = c.to_payload()
+        assert payload["amendment_status"] == "amended"
+        assert payload["amended_by"] == "IT (Amendment) Act, 2008"
+        assert payload["amendment_year"] == 2008
+
+    def test_invalid_amendment_status_raises(self):
+        """Only 'original', 'amended', 'omitted', 'repealed' are valid."""
+        with pytest.raises(ValidationError):
+            CorpusChunk(
+                act_name="ICA 1872",
+                section_number="1",
+                text="text",
+                source="test",
+                amendment_status="deleted",  # invalid
+            )
+

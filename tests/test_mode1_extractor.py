@@ -56,9 +56,20 @@ def test_extract_contract_text_docx_success(mock_docx):
 
 def test_extract_contract_text_unsupported():
     with patch.object(Path, "exists", return_value=True):
-        res = extract_contract_text(Path("dummy.txt"))
+        res = extract_contract_text(Path("dummy.xyz"))
         assert res.status == "failure"
         assert "Unsupported file format" in res.error_message
+
+
+def test_extract_contract_text_txt_success():
+    # Mock read_text to simulate successful text file extraction
+    with patch.object(Path, "exists", return_value=True):
+        with patch.object(Path, "read_text", return_value="Paragraph 1\n\nParagraph 2"):
+            res = extract_contract_text(Path("dummy.txt"))
+            assert res.status == "success"
+            assert len(res.paragraphs) == 2
+            assert res.paragraphs[0] == "Paragraph 1"
+            assert res.paragraphs[1] == "Paragraph 2"
 
 
 def test_extract_contract_text_not_found():

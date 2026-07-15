@@ -1,0 +1,1302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Nyaya AI — Indian Legal Contract Intelligence · Dark</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  :root {
+    /* Dark surfaces */
+    --obsidian: #121214;
+    --slate-dark: #1A1A1E;
+    --slate-grey: #232329;
+    --slate-elevated: #2A2A31;
+    
+    /* Text */
+    --ivory: #F5F4ED;
+    --amazon-mist: #ECECDC;
+    --muted-sand: #D1D1C7;
+    --muted-sand-dim: #8A8A82;
+    
+    /* Borders (always 10% opacity of Amazon Mist) */
+    --border-10: rgba(236, 237, 220, 0.10);
+    --border-08: rgba(236, 237, 220, 0.08);
+    --border-06: rgba(236, 237, 220, 0.06);
+    --border-15: rgba(236, 237, 220, 0.15);
+    
+    /* Accents */
+    --toxic-orange: #FF6037;
+    --toxic-orange-hover: #FF7855;
+    --rose-gold: #B66E79;
+    --rose-gold-tint: rgba(182, 110, 121, 0.25);
+    --rose-gold-soft: rgba(182, 110, 121, 0.12);
+    --aqua-mist: #A0C9CB;
+    --aqua-mist-tint: rgba(160, 201, 203, 0.15);
+    --aqua-mist-soft: rgba(160, 201, 203, 0.08);
+    
+    /* Risk indicators (dark-adapted) */
+    --garnet: #733635;
+    --garnet-bg: rgba(115, 54, 53, 0.22);
+    --garnet-border: rgba(115, 54, 53, 0.55);
+    --coral: #FF785A;
+    
+    --blush-pink: #FADADD;
+    --rose-gold-bg: rgba(182, 110, 121, 0.25);
+    --rose-gold-border: rgba(182, 110, 121, 0.45);
+    
+    --safe-bg: #1E3A20;
+    --safe-border: rgba(56, 87, 35, 0.6);
+    --safe-text: #A3E635;
+    --safe-text-dim: #84CC16;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--obsidian);
+    color: var(--ivory);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "ss01", "cv11";
+  }
+  
+  .font-display { font-family: 'Outfit', sans-serif; letter-spacing: -0.01em; }
+  .font-mono { font-family: 'JetBrains Mono', monospace; }
+  
+  /* === Borders === */
+  .border-kite { border: 1px solid var(--border-10); }
+  .border-kite-b { border-bottom: 1px solid var(--border-10); }
+  .border-kite-t { border-top: 1px solid var(--border-10); }
+  .border-kite-r { border-right: 1px solid var(--border-10); }
+  .border-kite-l { border-left: 1px solid var(--border-10); }
+  
+  /* === Risk badges === */
+  .risk-high {
+    background: var(--garnet);
+    color: var(--coral);
+    border: 1px solid var(--garnet-border);
+  }
+  .risk-medium {
+    background: var(--rose-gold-bg);
+    color: var(--blush-pink);
+    border: 1px solid var(--rose-gold-border);
+  }
+  .risk-safe {
+    background: var(--safe-bg);
+    color: var(--safe-text);
+    border: 1px solid var(--safe-border);
+  }
+  
+  /* === Clause navigation items === */
+  .clause-item {
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+    position: relative;
+  }
+  .clause-item:hover {
+    background: var(--slate-grey);
+  }
+  .clause-item.active {
+    background: var(--aqua-mist-tint);
+    border-left-color: var(--aqua-mist);
+  }
+  .clause-item.active::after {
+    content: '';
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--aqua-mist);
+  }
+  
+  /* === Clause blocks inside document === */
+  .clause-block {
+    padding: 14px 18px;
+    margin: 10px -18px;
+    border-radius: 0 6px 6px 0;
+    border-left: 3px solid transparent;
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+    position: relative;
+    scroll-margin-top: 100px;
+  }
+  .clause-block.safe {
+    border-left-color: rgba(163, 230, 53, 0.4);
+  }
+  .clause-block.medium {
+    border-left-color: var(--rose-gold);
+    background: rgba(182, 110, 121, 0.07);
+  }
+  .clause-block.high {
+    border-left-color: var(--garnet);
+    background: rgba(115, 54, 53, 0.10);
+  }
+  .clause-block.targeted {
+    box-shadow: inset 0 0 0 1px var(--aqua-mist-tint);
+    background: var(--aqua-mist-soft);
+  }
+  
+  /* === Inline risk markers === */
+  .inline-risk {
+    background: rgba(255, 120, 90, 0.18);
+    color: var(--coral);
+    font-weight: 600;
+    padding: 1px 4px;
+    border-radius: 3px;
+    border-bottom: 1px dashed var(--coral);
+  }
+  .inline-warn {
+    background: rgba(182, 110, 121, 0.20);
+    color: var(--blush-pink);
+    font-weight: 600;
+    padding: 1px 4px;
+    border-radius: 3px;
+    border-bottom: 1px dashed var(--rose-gold);
+  }
+  
+  /* === Dropzone === */
+  .dropzone {
+    border: 1.5px dashed var(--border-15);
+    transition: all 0.2s ease;
+    background: var(--slate-grey);
+  }
+  .dropzone:hover {
+    border-color: var(--rose-gold);
+    background: var(--rose-gold-soft);
+  }
+  .dropzone:hover .dz-icon {
+    color: var(--rose-gold);
+    transform: translateY(-2px);
+  }
+  .dz-icon { transition: all 0.2s ease; }
+  
+  /* === Scrollbar === */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-15); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted-sand-dim); }
+  
+  /* === Animations === */
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+  }
+  .pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+  
+  @keyframes pulse-ring {
+    0% { box-shadow: 0 0 0 0 rgba(255, 96, 55, 0.5); }
+    70% { box-shadow: 0 0 0 5px rgba(255, 96, 55, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 96, 55, 0); }
+  }
+  .pulse-ring { animation: pulse-ring 2s ease-out infinite; }
+  
+  @keyframes draw-dial {
+    from { stroke-dashoffset: 326.7; }
+    to { stroke-dashoffset: 16.3; }
+  }
+  .dial-progress { animation: draw-dial 2.2s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+  
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .fade-up { animation: fade-up 0.5s ease-out forwards; }
+  
+  @keyframes scan-beam {
+    0% { transform: translateY(-100%); opacity: 0; }
+    50% { opacity: 0.5; }
+    100% { transform: translateY(2200%); opacity: 0; }
+  }
+  .scan-beam { animation: scan-beam 4.5s ease-in-out infinite; }
+  
+  @keyframes draw-spark { to { stroke-dashoffset: 0; } }
+  
+  /* === Buttons === */
+  .btn-primary {
+    background: var(--slate-elevated);
+    color: var(--ivory);
+    border: 1px solid var(--border-15);
+    transition: all 0.15s ease;
+  }
+  .btn-primary:hover { background: var(--slate-grey); border-color: var(--muted-sand-dim); }
+  
+  .btn-accent {
+    background: var(--toxic-orange);
+    color: #1A0A05;
+    transition: all 0.15s ease;
+    font-weight: 600;
+  }
+  .btn-accent:hover { background: var(--toxic-orange-hover); transform: translateY(-1px); }
+  
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border-10);
+    color: var(--muted-sand);
+    transition: all 0.15s ease;
+  }
+  .btn-ghost:hover { background: var(--slate-grey); color: var(--ivory); border-color: var(--border-15); }
+  
+  /* === Selection === */
+  ::selection { background: var(--aqua-mist-tint); color: var(--ivory); }
+  
+  /* === Document typography === */
+  .doc-content { 
+    font-family: 'Inter', sans-serif; 
+    line-height: 1.75; 
+    color: var(--ivory); 
+    font-size: 13px; 
+  }
+  .doc-content h2 { font-family: 'Outfit', sans-serif; font-weight: 600; letter-spacing: 0.01em; }
+  .doc-content p { margin-bottom: 0.875rem; text-align: justify; }
+  .doc-content .clause-num { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted-sand-dim); }
+  .doc-content em { color: var(--muted-sand); }
+  .doc-content strong { color: var(--ivory); font-weight: 600; }
+  
+  /* === Statutory callout boxes inside document === */
+  .callout-high {
+    background: rgba(115, 54, 53, 0.18);
+    border: 1px solid rgba(115, 54, 53, 0.45);
+  }
+  .callout-medium {
+    background: rgba(182, 110, 121, 0.12);
+    border: 1px solid rgba(182, 110, 121, 0.35);
+  }
+  .callout-info {
+    background: rgba(160, 201, 203, 0.06);
+    border: 1px solid rgba(160, 201, 203, 0.25);
+  }
+  
+  /* === Tooltip === */
+  [data-tooltip] { position: relative; }
+  [data-tooltip]:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--slate-elevated);
+    color: var(--ivory);
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border-15);
+    white-space: nowrap;
+    z-index: 50;
+    pointer-events: none;
+  }
+  
+  /* === Lift on hover === */
+  .lift { transition: transform 0.15s ease, border-color 0.15s ease, background-color 0.15s ease; }
+  .lift:hover { transform: translateY(-1px); }
+  
+  /* === Mobile === */
+  .mobile-tabs { display: none; }
+  @media (max-width: 1280px) {
+    .dashboard-grid { grid-template-columns: 300px 1fr 360px !important; }
+  }
+  @media (max-width: 1024px) {
+    .mobile-tabs { display: flex; }
+    .dashboard-grid { grid-template-columns: 1fr !important; height: calc(100vh - 168px) !important; }
+    .panel-left, .panel-right { display: none; }
+    .panel-left.mobile-active, .panel-right.mobile-active { display: flex; }
+    .panel-center.mobile-active { display: flex; }
+    .panel-center { display: none; }
+  }
+  
+  /* === Filter chip === */
+  .filter-chip { transition: all 0.15s ease; }
+  .filter-chip:not(.active):hover { background: var(--slate-grey); border-color: var(--border-15); }
+  
+  /* === Sparkline === */
+  .sparkline path { stroke-dasharray: 200; stroke-dashoffset: 200; animation: draw-spark 2s ease-out 0.5s forwards; }
+  
+  /* === Subtle paper grain on document === */
+  .doc-paper { position: relative; }
+  .doc-paper::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+    opacity: 0.018;
+    pointer-events: none;
+    mix-blend-mode: screen;
+    border-radius: inherit;
+  }
+  
+  /* === Tabular numerics === */
+  .tnum { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+
+<!-- ============= HEADER ============= -->
+<header class="border-kite-b bg-[var(--slate-dark)] px-5 h-[60px] flex items-center justify-between z-30 relative">
+  <div class="flex items-center gap-5">
+    <!-- Brand -->
+    <div class="flex items-center gap-2.5">
+      <div class="w-9 h-9 rounded-md bg-[var(--slate-elevated)] border border-[var(--border-15)] flex items-center justify-center relative overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-br from-[var(--rose-gold)]/20 via-transparent to-transparent"></div>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" class="relative z-10">
+          <path d="M12 2.5L4 6.2V12C4 16.5 7.4 20.6 12 22C16.6 20.6 20 16.5 20 12V6.2L12 2.5Z" stroke="#FF6037" stroke-width="1.5" stroke-linejoin="round"/>
+          <path d="M8.5 12L11 14.5L15.5 9.5" stroke="#F5F4ED" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div>
+        <div class="font-display font-semibold text-[15px] tracking-tight leading-none text-[var(--ivory)]">Nyaya<span class="text-[var(--toxic-orange)]">.</span>AI</div>
+        <div class="text-[9px] uppercase tracking-[0.18em] text-[var(--muted-sand-dim)] mt-1">Contract Intelligence</div>
+      </div>
+    </div>
+    
+    <div class="h-7 w-px bg-[var(--border-10)]"></div>
+    
+    <!-- Contract selector -->
+    <button class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md hover:bg-[var(--slate-grey)] transition group">
+      <i data-lucide="folder-open" class="w-3.5 h-3.5 text-[var(--muted-sand-dim)]"></i>
+      <div class="text-left">
+        <div class="text-[9px] uppercase tracking-wider text-[var(--muted-sand-dim)] leading-none mb-0.5">Reviewing</div>
+        <div class="text-[13px] font-medium leading-tight text-[var(--ivory)]">TechNova — Vertex NDA</div>
+      </div>
+      <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-[var(--muted-sand-dim)] group-hover:text-[var(--ivory)]"></i>
+    </button>
+  </div>
+  
+  <div class="flex items-center gap-2">
+    <!-- Search -->
+    <div class="relative hidden md:block">
+      <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-sand-dim)]"></i>
+      <input type="text" placeholder="Search clauses, statutes, citations…" 
+             class="bg-[var(--slate-grey)] border border-[var(--border-10)] rounded-md pl-9 pr-14 py-1.5 text-[13px] w-72 focus:outline-none focus:border-[var(--aqua-mist)] focus:bg-[var(--slate-elevated)] transition text-[var(--ivory)] placeholder:text-[var(--muted-sand-dim)]">
+      <kbd class="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-mono text-[var(--muted-sand-dim)] bg-[var(--obsidian)] border border-[var(--border-15)] rounded px-1.5 py-0.5">⌘K</kbd>
+    </div>
+    
+    <button class="w-8 h-8 rounded-md hover:bg-[var(--slate-grey)] flex items-center justify-center relative transition text-[var(--muted-sand)]" data-tooltip="3 new alerts">
+      <i data-lucide="bell" class="w-4 h-4"></i>
+      <span class="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-[var(--toxic-orange)] rounded-full pulse-ring"></span>
+    </button>
+    
+    <button class="w-8 h-8 rounded-md hover:bg-[var(--slate-grey)] flex items-center justify-center transition text-[var(--muted-sand)]" data-tooltip="Settings">
+      <i data-lucide="settings-2" class="w-4 h-4"></i>
+    </button>
+    
+    <!-- Theme indicator -->
+    <div class="flex items-center gap-1 px-1.5 py-1 rounded-md border border-[var(--border-10)] bg-[var(--slate-grey)]">
+      <button class="w-5 h-5 rounded flex items-center justify-center text-[var(--muted-sand-dim)] hover:text-[var(--ivory)] transition">
+        <i data-lucide="sun" class="w-3 h-3"></i>
+      </button>
+      <button class="w-5 h-5 rounded flex items-center justify-center bg-[var(--slate-elevated)] text-[var(--toxic-orange)]">
+        <i data-lucide="moon" class="w-3 h-3"></i>
+      </button>
+    </div>
+    
+    <div class="h-7 w-px bg-[var(--border-10)] mx-1"></div>
+    
+    <div class="flex items-center gap-2.5 pr-1">
+      <div class="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--rose-gold)] to-[#8C4E4F] flex items-center justify-center text-white text-[11px] font-semibold border border-[var(--border-15)]">AK</div>
+      <div class="hidden lg:block">
+        <div class="text-[13px] font-medium leading-tight text-[var(--ivory)]">Adv. Ananya Krishnan</div>
+        <div class="text-[10px] text-[var(--muted-sand-dim)] leading-tight">Senior Counsel · Bangalore</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ============= SUB BAR ============= -->
+<div class="border-kite-b bg-[var(--slate-dark)] px-5 h-[52px] flex items-center justify-between">
+  <div class="flex items-center gap-5 text-[11px]">
+    <div class="flex items-center gap-2">
+      <span class="w-1.5 h-1.5 rounded-full bg-[var(--safe-text)] pulse-dot"></span>
+      <span class="text-[var(--muted-sand-dim)]">Scan complete</span>
+      <span class="font-mono text-[var(--border-15)]">·</span>
+      <span class="font-medium text-[var(--ivory)] tnum">2m 14s ago</span>
+    </div>
+    <div class="hidden md:flex items-center gap-1.5 text-[var(--muted-sand-dim)]">
+      <i data-lucide="file-text" class="w-3 h-3"></i>
+      <span class="font-mono tnum">24 pp.</span>
+    </div>
+    <div class="hidden md:flex items-center gap-1.5 text-[var(--muted-sand-dim)]">
+      <i data-lucide="layers" class="w-3 h-3"></i>
+      <span class="font-mono tnum">10 clauses</span>
+    </div>
+    <div class="hidden lg:flex items-center gap-1.5 text-[var(--coral)]">
+      <i data-lucide="alert-triangle" class="w-3 h-3"></i>
+      <span class="font-mono font-medium tnum">5 risks</span>
+    </div>
+    <div class="hidden lg:flex items-center gap-1.5 text-[var(--muted-sand-dim)]">
+      <i data-lucide="scale" class="w-3 h-3"></i>
+      <span class="font-mono tnum">4 statutes</span>
+    </div>
+    <div class="hidden xl:flex items-center gap-1.5 text-[var(--muted-sand-dim)]">
+      <i data-lucide="gavel" class="w-3 h-3"></i>
+      <span class="font-mono tnum">2 precedents</span>
+    </div>
+  </div>
+  
+  <div class="flex items-center gap-1.5">
+    <button class="btn-ghost px-2.5 py-1.5 rounded-md text-[11px] font-medium flex items-center gap-1.5">
+      <i data-lucide="history" class="w-3 h-3"></i>
+      <span class="hidden sm:inline">v3.2 · History</span>
+    </button>
+    <button class="btn-ghost px-2.5 py-1.5 rounded-md text-[11px] font-medium flex items-center gap-1.5">
+      <i data-lucide="share-2" class="w-3 h-3"></i>
+      <span class="hidden sm:inline">Share</span>
+    </button>
+    <button class="btn-accent px-3 py-1.5 rounded-md text-[11px] flex items-center gap-1.5">
+      <i data-lucide="file-down" class="w-3 h-3"></i>
+      <span>Export Report</span>
+    </button>
+  </div>
+</div>
+
+<!-- ============= MOBILE TABS ============= -->
+<div class="mobile-tabs border-kite-b bg-[var(--slate-dark)] px-3 py-2 gap-1.5">
+  <button data-tab="left" class="tab-btn flex-1 py-2 text-[11px] font-medium rounded-md border border-[var(--border-10)] text-[var(--muted-sand)]">Clauses</button>
+  <button data-tab="center" class="tab-btn flex-1 py-2 text-[11px] font-medium rounded-md bg-[var(--toxic-orange)] text-[#1A0A05]">Document</button>
+  <button data-tab="right" class="tab-btn flex-1 py-2 text-[11px] font-medium rounded-md border border-[var(--border-10)] text-[var(--muted-sand)]">Analysis</button>
+</div>
+
+<!-- ============= MAIN GRID ============= -->
+<div class="dashboard-grid grid" style="grid-template-columns: 320px 1fr 380px; height: calc(100vh - 112px);">
+  
+  <!-- ============= LEFT: CLAUSE NAVIGATOR ============= -->
+  <aside class="panel-left border-kite-r bg-[var(--slate-dark)] flex flex-col overflow-hidden">
+    
+    <div class="px-4 pt-4 pb-3 border-kite-b">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h2 class="font-display font-semibold text-[13px] tracking-tight text-[var(--ivory)]">Clause Navigator</h2>
+          <p class="text-[10px] text-[var(--muted-sand-dim)] mt-0.5">10 clauses · sequenced by section</p>
+        </div>
+        <button class="text-[var(--muted-sand-dim)] hover:text-[var(--ivory)] w-6 h-6 rounded flex items-center justify-center hover:bg-[var(--slate-grey)] transition">
+          <i data-lucide="list-filter" class="w-3.5 h-3.5"></i>
+        </button>
+      </div>
+      
+      <!-- Filter chips -->
+      <div class="flex items-center gap-1 overflow-x-auto pb-0.5">
+        <button class="filter-chip active px-2 py-1 text-[10px] font-semibold rounded bg-[var(--toxic-orange)] text-[#1A0A05] whitespace-nowrap">All · 10</button>
+        <button class="filter-chip px-2 py-1 text-[10px] font-medium rounded bg-[var(--slate-grey)] border border-[var(--border-10)] text-[var(--muted-sand)] whitespace-nowrap flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-[var(--garnet)]"></span>High <span class="text-[var(--muted-sand-dim)] font-mono">2</span>
+        </button>
+        <button class="filter-chip px-2 py-1 text-[10px] font-medium rounded bg-[var(--slate-grey)] border border-[var(--border-10)] text-[var(--muted-sand)] whitespace-nowrap flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-[var(--rose-gold)]"></span>Med <span class="text-[var(--muted-sand-dim)] font-mono">3</span>
+        </button>
+        <button class="filter-chip px-2 py-1 text-[10px] font-medium rounded bg-[var(--slate-grey)] border border-[var(--border-10)] text-[var(--muted-sand)] whitespace-nowrap flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-[var(--safe-text)]"></span>Safe <span class="text-[var(--muted-sand-dim)] font-mono">5</span>
+        </button>
+      </div>
+    </div>
+    
+    <!-- Clause list -->
+    <div class="flex-1 overflow-y-auto">
+      <div class="clause-list">
+        
+        <div class="clause-item active px-4 py-2.5 border-kite-b" data-clause="1">
+          <div class="flex items-start justify-between gap-2 mb-0.5">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <span class="text-[10px] font-mono text-[var(--muted-sand-dim)]">§ 1</span>
+              <span class="text-[12px] font-medium truncate text-[var(--ivory)]">Definitions</span>
+            </div>
+            <span class="risk-safe text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider flex-shrink-0">Safe</span>
+          </div>
+          <p class="text-[10.5px] text-[var(--muted-sand-dim)] leading-snug">Confidential Information scope and standard carve-outs</p>
+        </div>
+        
+        <div class="clause-item px-4 py-2.5 border-kite-b" data-clause="2">
+          <div class="flex items-start justify-between gap-2 mb-0.5">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <span class="text-[10px] font-mono text-[var(--muted-sand-dim)]">§ 2.1</span>
+              <span class="text-[12px] font-medium truncate text-[var(--ivory)]">Confidentiality Obligations</span>
+            </div>
+            <span class="risk-safe text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider flex-shrink-0">Safe</span>
+          </div>
+          <p class="text-[10.5px] text-[var(--muted-sand-dim)] leading-snug">Mutual NDA protections, well-drafted scope</p>
+        </div>
+        
+        <div class="clause-item px-4 py-2.5 border-kite-b" data-clause="3">
+          <div class="flex items-start justify-between gap-2 mb-0.5">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <span class="text-[10px] font-mono text-[var(--coral)]">§ 2.3</span>
+              <span class="text-[12px] font-medium truncate text-[var(--ivory)]">Non-Compete Clause</span>
+            </div>
+            <span class="risk-high text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider flex items-center gap-0.5 flex-shrink-0">
+              <i data-lucide="alert-triangle" class="w-2 h-2"></i>Void
+            </span>
+          </div>
+          <p class="text-[10.5px] text-[var(--muted-sand-dim)] leading-snug">5-year restriction likely void under <span class="font-mono text-[var(--coral)]">ICA §27</span></p>
+        </div>
+        
+        <div class="clause-item px-4 py-2.5 border-kite-b" data-clause="4">
+          <div class="flex items-start justify-between gap-2 mb-0.5">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <span class="text-[10px] font-mono text-[var(--muted-sand-dim)]">§ 3</span>
+              <span class="text-[12px] font-medium truncate text-[var(--ivory)]">Term & Termination</span>
+            </div>
+            <span class="risk-safe text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider flex-shrink-0">Safe</span>
+          </div>
+          <p class="text-[10.5px] text-[var(--muted-sand-dim)] leading-snug">3-year term with 30-day notice period</p>
+        </div>
+        
+        <div class="clause-item px-4 py-2.5 border-kite-b" data-clause="5">
+          <div class="flex items-start justify-between gap-2 mb-0.5">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <span class="text-[10px] font-mono text-[var(--muted-sand-dim)]">§ 4.1</span>
+              <span class="text-[12px] font-medium truncate text-[var(--ivory)]">Payment Terms</span>
+            </div>
+            <span class="risk-medium text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider flex-shrink-0">Review</span>
+          </div>
+          <p class="text-[10.5px] text-[var(--muted-sand-dim)] leading-snug">90-day cycle exceeds <span class="font-mono text-[var(--blush-pink)]">MSME §15</span> 45-day limit</p>
+        </div>
+        
+        <div class="clause-item px-4 py-2.5 border-kite-b" data-clause="6">
+          <div class="flex items-start justify-between gap-2 mb-0.5">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <span class="text-[10px] font-mono text-[var(--muted-sand-dim)]">§ 5</span>
+              <span class="text-[12px] font-medium truncate text-[var(--ivory)]">Intellectual Property</span>
+            </div>
+            <span class="risk-safe text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider flex-shrink-0">Safe</span>
+          </div>
+          <p class="text-[10.5px] text-[var(--muted-sand-dim)] leading-snug">IP assignment clearly scoped and limited</p>
+        </div>
+        
+        <div class="clause-item px-4 py-2.5 border-kite-b" data-clause="7">
+          <div class="flex items-start justify-between gap-2 mb-0.5">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <span class="text-[10px] font-mono text-[var(--muted-sand-dim)]">§ 6</span>
+              <span class="text-[12px] font-medium truncate text-[var(--ivory)]">Indemnification</span>
+            </div>
+            <span class="risk-medium text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider flex-shrink-0">Review</span>
+          </div>
+          <p class="text-[10.5px] text-[var(--muted-sand-dim)] leading-snug">Uncapped IP indemnity — consider carve-outs</p>
+        </div>
+        
+        <div class="clause-item px-4 py-2.5 border-kite-b" data-clause="8">
+          <div class="flex items-start justify-between gap-2 mb-0.5">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <span class="text-[10px] font-mono text-[var(--coral)]">§ 7</span>
+              <span class="text-[12px] font-medium truncate text-[var(--ivory)]">Dispute Resolution</span>
+            </div>
+            <span class="risk-high text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider flex items-center gap-0.5 flex-shrink-0">
+              <i data-lucide="alert-triangle" class="w-2 h-2"></i>Void
+            </span>
+          </div>
+          <p class="text-[10.5px] text-[var(--muted-sand-dim)] leading-snug">Exclusive Singapore jurisdiction — unenforceable</p>
+        </div>
+        
+        <div class="clause-item px-4 py-2.5 border-kite-b" data-clause="9">
+          <div class="flex items-start justify-between gap-2 mb-0.5">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <span class="text-[10px] font-mono text-[var(--muted-sand-dim)]">§ 8</span>
+              <span class="text-[12px] font-medium truncate text-[var(--ivory)]">Governing Law</span>
+            </div>
+            <span class="risk-safe text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider flex-shrink-0">Safe</span>
+          </div>
+          <p class="text-[10.5px] text-[var(--muted-sand-dim)] leading-snug">Indian law applies — consistent with parties</p>
+        </div>
+        
+        <div class="clause-item px-4 py-2.5 border-kite-b" data-clause="10">
+          <div class="flex items-start justify-between gap-2 mb-0.5">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <span class="text-[10px] font-mono text-[var(--muted-sand-dim)]">§ 9</span>
+              <span class="text-[12px] font-medium truncate text-[var(--ivory)]">Limitation of Liability</span>
+            </div>
+            <span class="risk-medium text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider flex-shrink-0">Review</span>
+          </div>
+          <p class="text-[10.5px] text-[var(--muted-sand-dim)] leading-snug">Cap at 12-month fees — verify reasonableness</p>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Dropzone -->
+    <div class="p-3 border-kite-t bg-[var(--slate-dark)]">
+      <div class="dropzone rounded-md p-3.5 text-center cursor-pointer">
+        <i data-lucide="upload-cloud" class="dz-icon w-5 h-5 mx-auto mb-1 text-[var(--muted-sand-dim)]"></i>
+        <div class="text-[11px] font-semibold text-[var(--ivory)] mb-0.5">Drop new contract</div>
+        <div class="text-[9.5px] text-[var(--muted-sand-dim)]">PDF, DOCX · up to 50 MB · or click to browse</div>
+      </div>
+    </div>
+  </aside>
+  
+  <!-- ============= CENTER: DOCUMENT VIEW ============= -->
+  <main class="panel-center bg-[var(--obsidian)] flex flex-col overflow-hidden relative">
+    
+    <!-- Document toolbar -->
+    <div class="border-kite-b bg-[var(--slate-dark)] px-5 py-2 flex items-center justify-between flex-shrink-0">
+      <div class="flex items-center gap-2">
+        <div class="flex items-center gap-0.5 border border-[var(--border-10)] rounded-md p-0.5 bg-[var(--slate-grey)]">
+          <button class="w-6 h-6 rounded hover:bg-[var(--slate-elevated)] flex items-center justify-center text-[var(--muted-sand)]"><i data-lucide="zoom-out" class="w-3 h-3"></i></button>
+          <span class="text-[10px] font-mono w-9 text-center text-[var(--ivory)] tnum">100%</span>
+          <button class="w-6 h-6 rounded hover:bg-[var(--slate-elevated)] flex items-center justify-center text-[var(--muted-sand)]"><i data-lucide="zoom-in" class="w-3 h-3"></i></button>
+        </div>
+        <button class="px-2 py-1 text-[11px] rounded hover:bg-[var(--slate-grey)] flex items-center gap-1.5 text-[var(--muted-sand)] hover:text-[var(--ivory)] transition"><i data-lucide="highlighter" class="w-3 h-3"></i>Annotate</button>
+        <button class="px-2 py-1 text-[11px] rounded hover:bg-[var(--slate-grey)] flex items-center gap-1.5 text-[var(--muted-sand)] hover:text-[var(--ivory)] transition"><i data-lucide="message-square-text" class="w-3 h-3"></i>Comment</button>
+        <button class="px-2 py-1 text-[11px] rounded hover:bg-[var(--slate-grey)] flex items-center gap-1.5 text-[var(--muted-sand)] hover:text-[var(--ivory)] transition"><i data-lucide="git-compare-arrows" class="w-3 h-3"></i>Compare</button>
+      </div>
+      
+      <div class="flex items-center gap-3 text-[10px] text-[var(--muted-sand-dim)]">
+        <span class="font-mono tnum">Page 1 / 24</span>
+        <div class="h-4 w-px bg-[var(--border-10)]"></div>
+        <div class="flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-[var(--rose-gold)] pulse-dot"></span>
+          <span class="text-[var(--blush-pink)]">AI reviewing § 2.3</span>
+        </div>
+        <div class="h-4 w-px bg-[var(--border-10)]"></div>
+        <button class="hover:text-[var(--ivory)] flex items-center gap-1 transition"><i data-lucide="maximize-2" class="w-3 h-3"></i></button>
+      </div>
+    </div>
+    
+    <!-- Document scroll area -->
+    <div class="flex-1 overflow-y-auto px-6 py-8 relative">
+      <!-- Scan beam effect -->
+      <div class="absolute left-0 right-0 h-12 bg-gradient-to-b from-transparent via-[var(--aqua-mist)]/8 to-transparent scan-beam pointer-events-none z-10"></div>
+      
+      <div class="max-w-3xl mx-auto bg-[var(--slate-grey)] border-kite rounded-md doc-paper relative overflow-hidden">
+        
+        <!-- Document header -->
+        <div class="text-center px-10 pt-10 pb-6 border-kite-b relative">
+          <div class="flex items-center justify-center gap-2 mb-3">
+            <div class="h-px w-8 bg-[var(--border-15)]"></div>
+            <div class="text-[9px] uppercase tracking-[0.3em] text-[var(--muted-sand-dim)] font-semibold">Mutual Non-Disclosure Agreement</div>
+            <div class="h-px w-8 bg-[var(--border-15)]"></div>
+          </div>
+          <h1 class="font-display text-[26px] font-semibold mb-2 leading-tight text-[var(--ivory)]">TechNova Solutions Pvt. Ltd. <span class="text-[var(--muted-sand-dim)] font-light mx-1">×</span> Vertex Analytics LLP</h1>
+          <div class="text-[11px] text-[var(--muted-sand-dim)] flex items-center justify-center gap-3 mt-3">
+            <span>Effective <span class="font-mono text-[var(--muted-sand)] tnum">15.11.2024</span></span>
+            <span class="text-[var(--border-15)]">·</span>
+            <span>Ref <span class="font-mono text-[var(--muted-sand)]">TN-VA-NDA-2024-0892</span></span>
+            <span class="text-[var(--border-15)]">·</span>
+            <span>3-year term</span>
+          </div>
+        </div>
+        
+        <!-- Document body -->
+        <div class="doc-content px-10 py-8">
+          
+          <p class="text-[var(--muted-sand)] italic mb-4 text-[12px]">This Mutual Non-Disclosure Agreement ("Agreement") is made and entered into on this <strong class="not-italic text-[var(--ivory)]">15th day of November, 2024</strong> ("Effective Date") by and between:</p>
+          
+          <p><strong>TechNova Solutions Private Limited</strong>, a company incorporated under the Companies Act, 2013, having CIN U72200KA2019PTC128847, with its registered office at Prestige Tech Park, Marathahalli, Bengaluru, Karnataka 560103 (hereinafter referred to as the <em>"Disclosing Party"</em>);</p>
+          
+          <p class="text-center text-[var(--muted-sand-dim)] my-3">— AND —</p>
+          
+          <p><strong>Vertex Analytics LLP</strong>, a limited liability partnership registered under the Limited Liability Partnership Act, 2008, having LLIN AAB-1234, with its principal place of business at Cyber Hub, DLF Phase III, Gurugram, Haryana 122002 (hereinafter referred to as the <em>"Receiving Party"</em>).</p>
+          
+          <p class="text-[var(--muted-sand)] italic">WHEREAS, the Parties desire to explore a potential business relationship (the "<strong class="not-italic text-[var(--ivory)]">Purpose</strong>") and may disclose certain confidential and proprietary information to each other in connection therewith. NOW, THEREFORE, in consideration of the mutual covenants herein, the Parties agree as follows:</p>
+          
+          <!-- § 1 -->
+          <div class="clause-block safe" data-clause="1">
+            <div class="flex items-center justify-between mb-2">
+              <h2 class="text-[13px] font-semibold uppercase tracking-wide flex items-center gap-2 text-[var(--ivory)]">
+                <span class="clause-num">§ 1</span> Definitions
+              </h2>
+              <span class="risk-safe text-[8.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">Safe</span>
+            </div>
+            <p class="mb-1"><strong>"Confidential Information"</strong> means any non-public information disclosed by one Party to the other, whether in oral, written, electronic, or other form, including but not limited to trade secrets, business plans, customer data, technical specifications, source code, financial information, and marketing strategies, regardless of whether marked as confidential.</p>
+            <div class="mt-2 text-[11.5px] italic flex items-start gap-1.5 callout-info rounded-md p-2">
+              <i data-lucide="check-circle-2" class="w-3 h-3 mt-0.5 text-[var(--safe-text)] flex-shrink-0"></i>
+              <span class="text-[var(--muted-sand)]">Standard definition scope. Carve-outs for independently developed information and forced disclosures properly included.</span>
+            </div>
+          </div>
+          
+          <!-- § 2 -->
+          <div class="clause-block safe" data-clause="2">
+            <div class="flex items-center justify-between mb-2">
+              <h2 class="text-[13px] font-semibold uppercase tracking-wide flex items-center gap-2 text-[var(--ivory)]">
+                <span class="clause-num">§ 2</span> Confidentiality Obligations
+              </h2>
+              <span class="risk-safe text-[8.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">Safe</span>
+            </div>
+            <p class="mb-2"><strong class="clause-num">2.1</strong> The Receiving Party shall hold all Confidential Information in strict confidence and shall not disclose such information to any third party without the prior written consent of the Disclosing Party, except to its employees and advisors on a need-to-know basis.</p>
+            <p class="mb-2"><strong class="clause-num">2.2</strong> The Receiving Party shall use the Confidential Information solely for the Purpose and shall exercise at least the same degree of care as it uses to protect its own confidential information of similar importance, but no less than reasonable care.</p>
+          </div>
+          
+          <!-- § 2.3 - HIGH RISK -->
+          <div class="clause-block high" data-clause="3">
+            <div class="flex items-center justify-between mb-2">
+              <h2 class="text-[13px] font-semibold uppercase tracking-wide flex items-center gap-2 text-[var(--ivory)]">
+                <span class="clause-num text-[var(--coral)]">§ 2.3</span> Non-Compete Restriction
+              </h2>
+              <span class="risk-high text-[8.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider flex items-center gap-0.5">
+                <i data-lucide="alert-triangle" class="w-2.5 h-2.5"></i>Void · ICA §27
+              </span>
+            </div>
+            <p class="mb-2">The Receiving Party covenants that, for a period of <span class="inline-risk">five (5) years</span> commencing from the Effective Date or termination of this Agreement, it shall not, directly or indirectly, engage in, own, manage, operate, control, be employed by, or have any financial interest in any business that competes with the Disclosing Party within the <span class="inline-risk">Republic of India</span>, irrespective of the nature of such engagement.</p>
+            <div class="mt-3 p-2.5 callout-high rounded-md flex items-start gap-2">
+              <i data-lucide="scale" class="w-3.5 h-3.5 text-[var(--coral)] flex-shrink-0 mt-0.5"></i>
+              <div class="text-[11px] leading-relaxed text-[var(--muted-sand)]">
+                <strong class="text-[var(--coral)]">Statutory conflict:</strong> Indian Contract Act, 1872 — <span class="font-mono">§27</span> declares agreements in restraint of trade void, except sale of goodwill. <span class="font-mono">5-year</span> restriction is patently unreasonable. <em>Niranjan Shankar Golikari v. Century Spinning (1967)</em> permits only reasonable restrictions during employment term.
+              </div>
+            </div>
+          </div>
+          
+          <!-- § 3 -->
+          <div class="clause-block safe" data-clause="4">
+            <div class="flex items-center justify-between mb-2">
+              <h2 class="text-[13px] font-semibold uppercase tracking-wide flex items-center gap-2 text-[var(--ivory)]">
+                <span class="clause-num">§ 3</span> Term and Termination
+              </h2>
+              <span class="risk-safe text-[8.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">Safe</span>
+            </div>
+            <p>This Agreement shall commence on the Effective Date and remain in force for a period of <strong>three (3) years</strong>. Either Party may terminate this Agreement upon thirty (30) days prior written notice. The confidentiality obligations herein shall survive termination for a further period of three (3) years.</p>
+          </div>
+          
+          <!-- § 4 - MEDIUM -->
+          <div class="clause-block medium" data-clause="5">
+            <div class="flex items-center justify-between mb-2">
+              <h2 class="text-[13px] font-semibold uppercase tracking-wide flex items-center gap-2 text-[var(--ivory)]">
+                <span class="clause-num">§ 4.1</span> Payment Terms
+              </h2>
+              <span class="risk-medium text-[8.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">Review · MSME</span>
+            </div>
+            <p class="mb-2">All invoices submitted pursuant to any engagement arising from this Agreement shall be payable by the Receiving Party within <span class="inline-warn">ninety (90) days</span> from the date of receipt of a valid invoice. Disputed amounts shall be paid within fifteen (15) days of resolution.</p>
+            <div class="mt-3 p-2.5 callout-medium rounded-md flex items-start gap-2">
+              <i data-lucide="scale" class="w-3.5 h-3.5 text-[var(--blush-pink)] flex-shrink-0 mt-0.5"></i>
+              <div class="text-[11px] leading-relaxed text-[var(--muted-sand)]">
+                <strong class="text-[var(--blush-pink)]">Compliance issue:</strong> MSME Development Act, 2006 — <span class="font-mono">§15</span> mandates payment to MSME suppliers within <strong class="text-[var(--ivory)]">45 days</strong>. The 90-day term attracts daily compounded interest under <span class="font-mono">§16</span> and prohibits recovery under <span class="font-mono">§17</span>.
+              </div>
+            </div>
+          </div>
+          
+          <!-- § 5 -->
+          <div class="clause-block safe" data-clause="6">
+            <div class="flex items-center justify-between mb-2">
+              <h2 class="text-[13px] font-semibold uppercase tracking-wide flex items-center gap-2 text-[var(--ivory)]">
+                <span class="clause-num">§ 5</span> Intellectual Property
+              </h2>
+              <span class="risk-safe text-[8.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">Safe</span>
+            </div>
+            <p>All Confidential Information remains the sole property of the Disclosing Party. No intellectual property rights are transferred or licensed under this Agreement. The Receiving Party shall promptly notify the Disclosing Party of any actual or suspected misuse of such Confidential Information.</p>
+          </div>
+          
+          <!-- § 6 - MEDIUM -->
+          <div class="clause-block medium" data-clause="7">
+            <div class="flex items-center justify-between mb-2">
+              <h2 class="text-[13px] font-semibold uppercase tracking-wide flex items-center gap-2 text-[var(--ivory)]">
+                <span class="clause-num">§ 6</span> Indemnification
+              </h2>
+              <span class="risk-medium text-[8.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">Review</span>
+            </div>
+            <p class="mb-2">Each Party (the "<strong>Indemnifying Party</strong>") shall indemnify, defend, and hold harmless the other Party from and against any and all claims, damages, losses, liabilities, costs, and expenses (including reasonable attorneys' fees) arising out of or in connection with any breach of this Agreement, <span class="inline-warn">without limitation as to amount</span>.</p>
+            <div class="mt-2 text-[11px] italic flex items-start gap-1.5 callout-info rounded-md p-2">
+              <i data-lucide="info" class="w-3 h-3 mt-0.5 text-[var(--aqua-mist)] flex-shrink-0"></i>
+              <span class="text-[var(--muted-sand)]">Uncapped indemnity exposure. Consider reciprocal cap at fees paid in preceding 12 months and exclude indirect/consequential losses.</span>
+            </div>
+          </div>
+          
+          <!-- § 7 - HIGH RISK -->
+          <div class="clause-block high" data-clause="8">
+            <div class="flex items-center justify-between mb-2">
+              <h2 class="text-[13px] font-semibold uppercase tracking-wide flex items-center gap-2 text-[var(--ivory)]">
+                <span class="clause-num text-[var(--coral)]">§ 7</span> Dispute Resolution
+              </h2>
+              <span class="risk-high text-[8.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider flex items-center gap-0.5">
+                <i data-lucide="alert-triangle" class="w-2.5 h-2.5"></i>Unenforceable
+              </span>
+            </div>
+            <p class="mb-2">Any dispute, controversy, or claim arising out of or in connection with this Agreement shall be subject to the <span class="inline-risk">exclusive jurisdiction of the courts of Singapore</span>, and the Parties hereby submit to such jurisdiction. The language of any proceedings shall be English.</p>
+            <div class="mt-3 p-2.5 callout-high rounded-md flex items-start gap-2">
+              <i data-lucide="scale" class="w-3.5 h-3.5 text-[var(--coral)] flex-shrink-0 mt-0.5"></i>
+              <div class="text-[11px] leading-relaxed text-[var(--muted-sand)]">
+                <strong class="text-[var(--coral)]">Enforceability issue:</strong> Exclusive foreign jurisdiction clause is unenforceable where parties have no real connection to Singapore. <em>Indo Air SA v. Morgan Electric & Motor Co. (1995)</em> — Indian courts retain jurisdiction under <span class="font-mono">§20 CPC</span> if cause of action arises in India. Suggested amendment: exclusive jurisdiction of competent courts at Bengaluru.
+              </div>
+            </div>
+          </div>
+          
+          <!-- § 8 -->
+          <div class="clause-block safe" data-clause="9">
+            <div class="flex items-center justify-between mb-2">
+              <h2 class="text-[13px] font-semibold uppercase tracking-wide flex items-center gap-2 text-[var(--ivory)]">
+                <span class="clause-num">§ 8</span> Governing Law
+              </h2>
+              <span class="risk-safe text-[8.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">Safe</span>
+            </div>
+            <p>This Agreement shall be governed by and construed in accordance with the laws of the Republic of India, without giving effect to any conflict of law principles.</p>
+          </div>
+          
+          <!-- § 9 - MEDIUM -->
+          <div class="clause-block medium" data-clause="10">
+            <div class="flex items-center justify-between mb-2">
+              <h2 class="text-[13px] font-semibold uppercase tracking-wide flex items-center gap-2 text-[var(--ivory)]">
+                <span class="clause-num">§ 9</span> Limitation of Liability
+              </h2>
+              <span class="risk-medium text-[8.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">Review</span>
+            </div>
+            <p class="mb-2">In no event shall either Party be liable for any indirect, incidental, special, or consequential damages. The aggregate liability of either Party under this Agreement shall not exceed the amounts paid by the Receiving Party to the Disclosing Party in the <span class="inline-warn">twelve (12) months</span> preceding the event giving rise to liability.</p>
+            <div class="mt-2 text-[11px] italic flex items-start gap-1.5 callout-info rounded-md p-2">
+              <i data-lucide="info" class="w-3 h-3 mt-0.5 text-[var(--aqua-mist)] flex-shrink-0"></i>
+              <span class="text-[var(--muted-sand)]">Standard market cap. Verify against contract value — for high-value engagements, consider negotiating higher cap or specific carve-outs for IP indemnity.</span>
+            </div>
+          </div>
+          
+          <!-- Signature block -->
+          <div class="mt-10 pt-6 border-kite-t">
+            <div class="text-[10px] uppercase tracking-[0.2em] text-[var(--muted-sand-dim)] mb-4 text-center font-semibold">— In Witness Whereof —</div>
+            <div class="grid grid-cols-2 gap-8">
+              <div>
+                <div class="text-[11px] font-semibold mb-1 text-[var(--ivory)]">For TechNova Solutions Pvt. Ltd.</div>
+                <div class="text-[10px] text-[var(--muted-sand-dim)] mb-8">Name: Rajesh Mehta<br>Title: Chief Legal Officer<br>Date: ____________</div>
+                <div class="border-t border-[var(--border-15)] pt-1 text-[9px] text-[var(--muted-sand-dim)]">Authorized Signatory</div>
+              </div>
+              <div>
+                <div class="text-[11px] font-semibold mb-1 text-[var(--ivory)]">For Vertex Analytics LLP</div>
+                <div class="text-[10px] text-[var(--muted-sand-dim)] mb-8">Name: Priya Sharma<br>Title: Designated Partner<br>Date: ____________</div>
+                <div class="border-t border-[var(--border-15)] pt-1 text-[9px] text-[var(--muted-sand-dim)]">Authorized Signatory</div>
+              </div>
+            </div>
+          </div>
+          
+        </div>
+      </div>
+      
+      <!-- Document footer info -->
+      <div class="max-w-3xl mx-auto mt-4 flex items-center justify-between text-[10px] text-[var(--muted-sand-dim)] px-2">
+        <div class="flex items-center gap-3">
+          <span class="font-mono">SHA-256: 4a7f...8e2c</span>
+          <span>·</span>
+          <span>Verified source</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <i data-lucide="shield-check" class="w-3 h-3 text-[var(--safe-text)]"></i>
+          <span>Document integrity confirmed</span>
+        </div>
+      </div>
+    </div>
+  </main>
+  
+  <!-- ============= RIGHT: ANALYSIS PANEL ============= -->
+  <aside class="panel-right border-kite-l bg-[var(--slate-dark)] flex flex-col overflow-y-auto">
+    
+    <!-- Compliance Health Dial -->
+    <div class="px-5 py-5 border-kite-b">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h3 class="font-display font-semibold text-[13px] text-[var(--ivory)]">Compliance Health</h3>
+          <p class="text-[10px] text-[var(--muted-sand-dim)] mt-0.5">Scan confidence · last updated 2m ago</p>
+        </div>
+        <button class="text-[var(--muted-sand-dim)] hover:text-[var(--ivory)] w-6 h-6 rounded flex items-center justify-center hover:bg-[var(--slate-grey)] transition" data-tooltip="How is this calculated?">
+          <i data-lucide="info" class="w-3.5 h-3.5"></i>
+        </button>
+      </div>
+      
+      <div class="flex items-center gap-5">
+        <!-- Dial (Rose Gold, no glow) -->
+        <div class="relative w-[124px] h-[124px] flex-shrink-0">
+          <svg viewBox="0 0 120 120" class="w-full h-full -rotate-90">
+            <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(236, 237, 220, 0.08)" stroke-width="9"/>
+            <circle cx="60" cy="60" r="52" fill="none" stroke="#B66E79" stroke-width="9" 
+                    stroke-dasharray="326.7" stroke-dashoffset="16.3" stroke-linecap="round" 
+                    class="dial-progress"/>
+          </svg>
+          <div class="absolute inset-0 flex flex-col items-center justify-center">
+            <div class="font-display text-[32px] font-semibold leading-none tracking-tight text-[var(--ivory)] tnum">95<span class="text-base text-[var(--muted-sand-dim)] font-medium">%</span></div>
+            <div class="text-[8.5px] uppercase tracking-[0.15em] text-[var(--muted-sand-dim)] mt-1.5 font-semibold">Confidence</div>
+          </div>
+        </div>
+        
+        <!-- Stats -->
+        <div class="flex-1 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-[10.5px] text-[var(--muted-sand-dim)]">Statutes matched</span>
+            <span class="text-[11px] font-semibold font-mono text-[var(--ivory)] tnum">4</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-[10.5px] text-[var(--muted-sand-dim)]">Clauses analyzed</span>
+            <span class="text-[11px] font-semibold font-mono text-[var(--ivory)] tnum">10</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-[10.5px] text-[var(--muted-sand-dim)]">Avg. risk score</span>
+            <span class="text-[11px] font-semibold font-mono text-[var(--blush-pink)]">Medium</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-[10.5px] text-[var(--muted-sand-dim)]">Precedents cited</span>
+            <span class="text-[11px] font-semibold font-mono text-[var(--ivory)] tnum">2</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-[10.5px] text-[var(--muted-sand-dim)]">Model version</span>
+            <span class="text-[11px] font-semibold font-mono text-[var(--muted-sand-dim)]">v3.2.1</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Sparkline -->
+      <div class="mt-4 pt-3 border-t border-[var(--border-08)] flex items-center justify-between">
+        <div>
+          <div class="text-[9.5px] uppercase tracking-wider text-[var(--muted-sand-dim)] font-semibold mb-1">7-day confidence trend</div>
+          <div class="flex items-baseline gap-1.5">
+            <span class="text-[14px] font-display font-semibold text-[var(--ivory)] tnum">+3.2%</span>
+            <span class="text-[10px] text-[var(--safe-text)] flex items-center gap-0.5">
+              <i data-lucide="trending-up" class="w-2.5 h-2.5"></i>improving
+            </span>
+          </div>
+        </div>
+        <svg class="sparkline w-24 h-8" viewBox="0 0 96 32" fill="none">
+          <path d="M2 24 L14 20 L26 22 L38 16 L50 14 L62 10 L74 8 L94 4" stroke="#B66E79" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="94" cy="4" r="2" fill="#FF6037"/>
+        </svg>
+      </div>
+    </div>
+    
+    <!-- Risk Distribution -->
+    <div class="px-5 py-5 border-kite-b">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-display font-semibold text-[13px] text-[var(--ivory)]">Risk Distribution</h3>
+        <span class="text-[10px] font-mono text-[var(--muted-sand-dim)] tnum">10 clauses</span>
+      </div>
+      
+      <!-- Stacked bar -->
+      <div class="flex h-2 rounded-full overflow-hidden mb-3 border border-[var(--border-08)]">
+        <div class="bg-[var(--garnet)]" style="width: 20%" title="High Risk"></div>
+        <div class="bg-[var(--rose-gold)]" style="width: 30%" title="Medium"></div>
+        <div class="bg-[var(--safe-text-dim)]" style="width: 50%" title="Safe"></div>
+      </div>
+      
+      <div class="space-y-2">
+        <div class="flex items-center justify-between text-[11px] py-1">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-sm bg-[var(--garnet)]"></span>
+            <span class="font-medium text-[var(--ivory)]">High Risk</span>
+            <span class="text-[9.5px] text-[var(--coral)] font-mono">· Void</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-semibold text-[var(--ivory)] tnum">2</span>
+            <span class="text-[var(--muted-sand-dim)] text-[10px]">· 20%</span>
+          </div>
+        </div>
+        <div class="flex items-center justify-between text-[11px] py-1">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-sm bg-[var(--rose-gold)]"></span>
+            <span class="font-medium text-[var(--ivory)]">Medium / Review</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-semibold text-[var(--ivory)] tnum">3</span>
+            <span class="text-[var(--muted-sand-dim)] text-[10px]">· 30%</span>
+          </div>
+        </div>
+        <div class="flex items-center justify-between text-[11px] py-1">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-sm bg-[var(--safe-text-dim)]"></span>
+            <span class="font-medium text-[var(--ivory)]">Safe / Compliant</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono font-semibold text-[var(--ivory)] tnum">5</span>
+            <span class="text-[var(--muted-sand-dim)] text-[10px]">· 50%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Statutory References -->
+    <div class="px-5 py-5 border-kite-b">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-display font-semibold text-[13px] text-[var(--ivory)]">Statutory References</h3>
+        <span class="text-[10px] font-mono text-[var(--muted-sand-dim)] tnum">4 statutes</span>
+      </div>
+      <div class="space-y-2">
+        <!-- ICA §27 -->
+        <div class="callout-high rounded-md p-2.5 lift cursor-pointer">
+          <div class="flex items-start justify-between gap-2 mb-1">
+            <div class="flex items-center gap-1.5">
+              <i data-lucide="scale" class="w-3 h-3 text-[var(--coral)]"></i>
+              <span class="text-[11px] font-semibold leading-tight text-[var(--ivory)]">Indian Contract Act, 1872</span>
+            </div>
+            <span class="text-[8.5px] font-bold uppercase text-[var(--coral)] tracking-wider">Void</span>
+          </div>
+          <div class="text-[10px] font-mono text-[var(--muted-sand-dim)] mb-1">§ 27 — Restraint of Trade</div>
+          <p class="text-[10.5px] leading-relaxed text-[var(--muted-sand)]">5-year non-compete is void ab initio. Per <em>Niranjan Golikari (1967)</em>, only restrictions during employment term are enforceable.</p>
+        </div>
+        
+        <!-- MSME -->
+        <div class="callout-medium rounded-md p-2.5 lift cursor-pointer">
+          <div class="flex items-start justify-between gap-2 mb-1">
+            <div class="flex items-center gap-1.5">
+              <i data-lucide="scale" class="w-3 h-3 text-[var(--blush-pink)]"></i>
+              <span class="text-[11px] font-semibold leading-tight text-[var(--ivory)]">MSME Development Act, 2006</span>
+            </div>
+            <span class="text-[8.5px] font-bold uppercase text-[var(--blush-pink)] tracking-wider">Review</span>
+          </div>
+          <div class="text-[10px] font-mono text-[var(--muted-sand-dim)] mb-1">§ 15 — Liability to Pay</div>
+          <p class="text-[10.5px] leading-relaxed text-[var(--muted-sand)]">90-day payment term exceeds the statutory 45-day limit for MSME suppliers. Interest accrues at 3× bank rate under §16.</p>
+        </div>
+        
+        <!-- CPC §20 -->
+        <div class="callout-high rounded-md p-2.5 lift cursor-pointer">
+          <div class="flex items-start justify-between gap-2 mb-1">
+            <div class="flex items-center gap-1.5">
+              <i data-lucide="scale" class="w-3 h-3 text-[var(--coral)]"></i>
+              <span class="text-[11px] font-semibold leading-tight text-[var(--ivory)]">Code of Civil Procedure, 1908</span>
+            </div>
+            <span class="text-[8.5px] font-bold uppercase text-[var(--coral)] tracking-wider">Void</span>
+          </div>
+          <div class="text-[10px] font-mono text-[var(--muted-sand-dim)] mb-1">§ 20 — Territorial Jurisdiction</div>
+          <p class="text-[10.5px] leading-relaxed text-[var(--muted-sand)]">Exclusive Singapore jurisdiction unenforceable where cause of action arises in India per <em>Indo Air SA (1995)</em>.</p>
+        </div>
+        
+        <!-- IT Act -->
+        <div class="rounded-md p-2.5 lift cursor-pointer bg-[var(--slate-grey)] border border-[var(--border-10)]">
+          <div class="flex items-start justify-between gap-2 mb-1">
+            <div class="flex items-center gap-1.5">
+              <i data-lucide="scale" class="w-3 h-3 text-[var(--safe-text)]"></i>
+              <span class="text-[11px] font-semibold leading-tight text-[var(--ivory)]">Information Technology Act, 2000</span>
+            </div>
+            <span class="text-[8.5px] font-bold uppercase text-[var(--safe-text)] tracking-wider">OK</span>
+          </div>
+          <div class="text-[10px] font-mono text-[var(--muted-sand-dim)] mb-1">§ 72A — Data Protection</div>
+          <p class="text-[10.5px] leading-relaxed text-[var(--muted-sand)]">Confidentiality provisions align with §72A disclosure penalties. Reasonable security practices under §43A noted.</p>
+        </div>
+      </div>
+    </div>
+    
+    <!-- AI Recommendations -->
+    <div class="px-5 py-5">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <h3 class="font-display font-semibold text-[13px] text-[var(--ivory)]">AI Recommendations</h3>
+          <span class="text-[9px] font-bold uppercase tracking-wider text-[var(--rose-gold)] bg-[var(--rose-gold-tint)] px-1.5 py-0.5 rounded">Beta</span>
+        </div>
+        <span class="text-[10px] font-mono text-[var(--muted-sand-dim)] flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-[var(--rose-gold)] pulse-dot"></span>
+          3 actions
+        </span>
+      </div>
+      
+      <div class="space-y-2">
+        <!-- Rec 1 -->
+        <div class="bg-[var(--slate-grey)] border border-[var(--garnet-border)] rounded-md p-2.5 lift cursor-pointer fade-up" style="animation-delay: 0.1s">
+          <div class="flex items-start gap-2.5">
+            <div class="w-6 h-6 rounded bg-[var(--garnet)] flex items-center justify-center flex-shrink-0 mt-0.5 border border-[var(--garnet-border)]">
+              <span class="text-[10px] font-bold text-[var(--coral)]">1</span>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-1.5 mb-0.5">
+                <span class="text-[11.5px] font-semibold text-[var(--ivory)]">Rewrite § 2.3 Non-Compete</span>
+                <span class="text-[8.5px] font-bold uppercase text-[var(--coral)] tracking-wider">Critical</span>
+              </div>
+              <p class="text-[10.5px] text-[var(--muted-sand)] leading-relaxed">Reduce restriction to <strong class="text-[var(--ivory)]">1 year post-term</strong>, scope to specific business units, and limit to current clients only.</p>
+              <div class="flex items-center gap-2 mt-2">
+                <button class="text-[10px] font-semibold text-[var(--toxic-orange)] flex items-center gap-1 hover:gap-1.5 transition-all">
+                  Apply suggestion <i data-lucide="arrow-right" class="w-2.5 h-2.5"></i>
+                </button>
+                <span class="text-[var(--border-15)] text-[10px]">·</span>
+                <button class="text-[10px] text-[var(--muted-sand-dim)] hover:text-[var(--ivory)] transition">Dismiss</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Rec 2 -->
+        <div class="bg-[var(--slate-grey)] border border-[var(--rose-gold-border)] rounded-md p-2.5 lift cursor-pointer fade-up" style="animation-delay: 0.2s">
+          <div class="flex items-start gap-2.5">
+            <div class="w-6 h-6 rounded bg-[var(--rose-gold-bg)] flex items-center justify-center flex-shrink-0 mt-0.5 border border-[var(--rose-gold-border)]">
+              <span class="text-[10px] font-bold text-[var(--blush-pink)]">2</span>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-1.5 mb-0.5">
+                <span class="text-[11.5px] font-semibold text-[var(--ivory)]">Revise § 4.1 Payment Terms</span>
+                <span class="text-[8.5px] font-bold uppercase text-[var(--blush-pink)] tracking-wider">High</span>
+              </div>
+              <p class="text-[10.5px] text-[var(--muted-sand)] leading-relaxed">Cap payment cycle at <strong class="text-[var(--ivory)]">45 days</strong> to comply with MSME Act §15. Add interest clause for delayed payments.</p>
+              <div class="flex items-center gap-2 mt-2">
+                <button class="text-[10px] font-semibold text-[var(--rose-gold)] flex items-center gap-1 hover:gap-1.5 transition-all">
+                  Apply suggestion <i data-lucide="arrow-right" class="w-2.5 h-2.5"></i>
+                </button>
+                <span class="text-[var(--border-15)] text-[10px]">·</span>
+                <button class="text-[10px] text-[var(--muted-sand-dim)] hover:text-[var(--ivory)] transition">Dismiss</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Rec 3 -->
+        <div class="bg-[var(--slate-grey)] border border-[var(--garnet-border)] rounded-md p-2.5 lift cursor-pointer fade-up" style="animation-delay: 0.3s">
+          <div class="flex items-start gap-2.5">
+            <div class="w-6 h-6 rounded bg-[var(--garnet)] flex items-center justify-center flex-shrink-0 mt-0.5 border border-[var(--garnet-border)]">
+              <span class="text-[10px] font-bold text-[var(--coral)]">3</span>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-1.5 mb-0.5">
+                <span class="text-[11.5px] font-semibold text-[var(--ivory)]">Update § 7 Dispute Resolution</span>
+                <span class="text-[8.5px] font-bold uppercase text-[var(--coral)] tracking-wider">Critical</span>
+              </div>
+              <p class="text-[10.5px] text-[var(--muted-sand)] leading-relaxed">Replace Singapore jurisdiction with <strong class="text-[var(--ivory)]">exclusive courts at Bengaluru</strong>. Add arbitration clause under Arbitration & Conciliation Act, 1996.</p>
+              <div class="flex items-center gap-2 mt-2">
+                <button class="text-[10px] font-semibold text-[var(--toxic-orange)] flex items-center gap-1 hover:gap-1.5 transition-all">
+                  Apply suggestion <i data-lucide="arrow-right" class="w-2.5 h-2.5"></i>
+                </button>
+                <span class="text-[var(--border-15)] text-[10px]">·</span>
+                <button class="text-[10px] text-[var(--muted-sand-dim)] hover:text-[var(--ivory)] transition">Dismiss</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- AI Assistant CTA -->
+      <button class="w-full mt-3 p-2.5 border border-dashed border-[var(--border-15)] rounded-md hover:border-[var(--rose-gold)] hover:bg-[var(--rose-gold-soft)] transition flex items-center justify-center gap-1.5 text-[11px] font-medium text-[var(--muted-sand)] hover:text-[var(--rose-gold)]">
+        <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+        Ask Nyaya AI to draft revisions
+      </button>
+    </div>
+  </aside>
+</div>
+
+<script>
+  // Initialize Lucide icons
+  lucide.createIcons();
+  
+  // Clause item click → highlight in document & scroll
+  const clauseItems = document.querySelectorAll('.clause-item');
+  const clauseBlocks = document.querySelectorAll('.clause-block');
+  
+  clauseItems.forEach(item => {
+    item.addEventListener('click', () => {
+      const clauseId = item.dataset.clause;
+      
+      clauseItems.forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+      
+      clauseBlocks.forEach(b => b.classList.remove('targeted'));
+      const targetBlock = document.querySelector(`.clause-block[data-clause="${clauseId}"]`);
+      if (targetBlock) {
+        targetBlock.classList.add('targeted');
+        targetBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      
+      if (window.innerWidth <= 1024) {
+        switchMobileTab('center');
+      }
+    });
+  });
+  
+  // Filter chips
+  const filterChips = document.querySelectorAll('.filter-chip');
+  filterChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      filterChips.forEach(c => {
+        c.classList.remove('active', 'bg-[var(--toxic-orange)]', 'text-[#1A0A05]');
+        c.classList.add('bg-[var(--slate-grey)]', 'border', 'border-[var(--border-10)]', 'text-[var(--muted-sand)]');
+      });
+      chip.classList.add('active', 'bg-[var(--toxic-orange)]', 'text-[#1A0A05]');
+      chip.classList.remove('bg-[var(--slate-grey)]', 'border', 'border-[var(--border-10)]', 'text-[var(--muted-sand)]');
+      
+      const filter = chip.textContent.trim().toLowerCase();
+      clauseItems.forEach(item => {
+        const riskBadge = item.querySelector('[class*="risk-"]');
+        if (!riskBadge) return;
+        const riskClass = Array.from(riskBadge.classList).find(c => c.startsWith('risk-'));
+        let riskType = '';
+        if (riskClass === 'risk-high') riskType = 'high';
+        else if (riskClass === 'risk-medium') riskType = 'medium';
+        else if (riskClass === 'risk-safe') riskType = 'safe';
+        
+        if (filter.startsWith('all') || filter.includes(riskType.slice(0, 3))) {
+          item.style.display = '';
+        } else {
+          item.style.display = 'none';
+        }
+      });
+    });
+  });
+  
+  // Mobile tab switching
+  function switchMobileTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.remove('bg-[var(--toxic-orange)]', 'text-[#1A0A05]');
+      b.classList.add('border', 'border-[var(--border-10)]', 'text-[var(--muted-sand)]');
+    });
+    const activeBtn = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
+    if (activeBtn) {
+      activeBtn.classList.add('bg-[var(--toxic-orange)]', 'text-[#1A0A05]');
+      activeBtn.classList.remove('border', 'border-[var(--border-10)]', 'text-[var(--muted-sand)]');
+    }
+    
+    document.querySelectorAll('.panel-left, .panel-center, .panel-right').forEach(p => {
+      p.classList.remove('mobile-active');
+      p.style.display = 'none';
+    });
+    const target = tab === 'left' ? '.panel-left' : tab === 'center' ? '.panel-center' : '.panel-right';
+    const targetEl = document.querySelector(target);
+    targetEl.classList.add('mobile-active');
+    targetEl.style.display = 'flex';
+  }
+  
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchMobileTab(btn.dataset.tab));
+  });
+  
+  if (window.innerWidth <= 1024) {
+    switchMobileTab('center');
+  }
+  
+  // Keyboard shortcut for search
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      const search = document.querySelector('input[type="text"]');
+      if (search) search.focus();
+    }
+  });
+  
+  // Dropzone interactions
+  const dropzone = document.querySelector('.dropzone');
+  if (dropzone) {
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.style.borderColor = 'var(--rose-gold)';
+      dropzone.style.background = 'var(--rose-gold-soft)';
+    });
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.style.borderColor = '';
+      dropzone.style.background = '';
+    });
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.style.borderColor = '';
+      dropzone.style.background = '';
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        showToast(`Analyzing ${files[0].name}…`);
+      }
+    });
+    dropzone.addEventListener('click', () => {
+      showToast('File picker opened (demo)');
+    });
+  }
+  
+  // Toast notifications
+  function showToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'fixed bottom-6 right-6 bg-[var(--slate-elevated)] text-[var(--ivory)] px-4 py-2.5 rounded-md text-xs font-medium flex items-center gap-2 z-50 border border-[var(--border-15)]';
+    toast.style.animation = 'fade-up 0.3s ease-out forwards';
+    toast.innerHTML = `<i data-lucide="loader" class="w-3.5 h-3.5 animate-spin text-[var(--toxic-orange)]"></i> ${message}`;
+    document.body.appendChild(toast);
+    lucide.createIcons();
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transition = 'opacity 0.3s';
+      setTimeout(() => toast.remove(), 300);
+    }, 2800);
+  }
+  
+  // Apply suggestion buttons
+  document.querySelectorAll('button').forEach(btn => {
+    if (btn.textContent.trim().startsWith('Apply suggestion')) {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showToast('Drafting revision in editor…');
+      });
+    }
+  });
+  
+  // Export report
+  document.querySelector('.btn-accent')?.addEventListener('click', () => {
+    showToast('Generating compliance report (PDF)…');
+  });
+</script>
+</body>
+</html>

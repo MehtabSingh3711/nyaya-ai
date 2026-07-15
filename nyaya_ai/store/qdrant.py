@@ -24,7 +24,7 @@ from qdrant_client.http.exceptions import (
 )
 from rich.console import Console
 
-from nyaya_ai.config import COLLECTION_NAME, EMBEDDING_DIM, QDRANT_PATH, QDRANT_URL
+from nyaya_ai.config import COLLECTION_NAME, EMBEDDING_DIM, QDRANT_PATH, QDRANT_URL, QDRANT_API_KEY
 
 console = Console()
 
@@ -36,7 +36,7 @@ def _get_client() -> QdrantClient:
     """Get or create a Qdrant client.
 
     Uses local file storage (QDRANT_PATH) when QDRANT_URL is None.
-    Uses server mode (QDRANT_URL) when set.
+    Uses server mode (QDRANT_URL) when set, passing QDRANT_API_KEY if present.
     Raises ConnectionError if server mode and Qdrant is not reachable.
     """
     global _client
@@ -45,8 +45,8 @@ def _get_client() -> QdrantClient:
 
     try:
         if QDRANT_URL:
-            # Docker / server mode
-            _client = QdrantClient(url=QDRANT_URL, timeout=10)
+            # Docker / server mode (including Qdrant Cloud)
+            _client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY, timeout=10)
             _client.get_collections()  # test connection
         else:
             # Local file-based mode (no Docker)
@@ -241,3 +241,114 @@ def get_point_count(collection_name: str = COLLECTION_NAME) -> int:
 
     info = client.get_collection(collection_name=collection_name)
     return info.points_count or 0
+
+
+def set_payload_bulk(
+    payload: dict,
+    collection_name: str = COLLECTION_NAME,
+    filter_condition: qmodels.Filter | None = None,
+) -> None:
+    """Set payload fields on all points (or filtered subset) without touching vectors.
+
+    This is a payload-only update — no re-embedding required.
+    Used for backfilling amendment_status="original" on existing points.
+
+    Args:
+        payload: Dict of payload fields to set (e.g. {"amendment_status": "original"}).
+        collection_name: Target collection name.
+        filter_condition: Optional Qdrant filter to restrict which points are updated.
+                          If None, updates ALL points in the collection.
+    """
+    client = _get_client()
+
+    client.set_payload(
+        collection_name=collection_name,
+        payload=payload,
+        points=filter_condition if filter_condition else qmodels.FilterSelector(
+            filter=qmodels.Filter(must=[])
+        ),
+    )
+    console.print(
+        f"[green]Set payload {payload} on points in '{collection_name}'.[/]"
+    )
+
+
+def find_points_by_section(
+    act_name: str,
+    section_number: str,
+    collection_name: str = COLLECTION_NAME,
+) -> list[dict]:
+    """Find existing points by act_name and section_number.
+
+    Uses Qdrant's scroll API with payload filters to find matching points
+    without needing vectors. Returns full payload + point ID for each match.
+
+    Args:
+        act_name: The Act name to search for (case-insensitive substring match).
+        section_number: The section number to match exactly.
+        collection_name: Target collection name.
+
+    Returns:
+        List of dicts, each containing 'id', 'act_name', 'section_number',
+        'text', and all other payload fields.
+    """
+    client = _get_client()
+
+    # Use must conditions: act_name match + section_number match
+    scroll_filter = qmodels.Filter(
+        must=[
+            qmodels.FieldCondition(
+                key="act_name",
+                match=qmodels.MatchText(text=act_name),
+            ),
+            qmodels.FieldCondition(
+                key="section_number",
+                match=qmodels.MatchValue(value=section_number),
+            ),
+        ]
+    )
+
+    results, _next_offset = client.scroll(
+        collection_name=collection_name,
+        scroll_filter=scroll_filter,
+        limit=100,
+        with_payload=True,
+        with_vectors=False,
+    )
+
+    hits = []
+    for point in results:
+        hit = dict(point.payload) if point.payload else {}
+        hit["id"] = point.id
+        hits.append(hit)
+
+    return hits
+
+
+def update_point_payload(
+    point_ids: list[str],
+    payload: dict,
+    collection_name: str = COLLECTION_NAME,
+) -> None:
+    """Update payload fields on specific points by ID.
+
+    Payload-only operation — vectors are not touched.
+
+    Args:
+        point_ids: List of Qdrant point ID strings to update.
+        payload: Dict of payload fields to set/overwrite.
+        collection_name: Target collection name.
+    """
+    if not point_ids:
+        return
+
+    client = _get_client()
+
+    client.set_payload(
+        collection_name=collection_name,
+        payload=payload,
+        points=point_ids,
+    )
+    console.print(
+        f"[green]Updated payload on {len(point_ids)} point(s) in '{collection_name}'.[/]"
+    )

@@ -45,3 +45,34 @@ def test_chunk_contract_fallback_docx():
     assert clauses[0].page == 0
     assert clauses[1].clause_number == "2"
     assert clauses[1].page == 0
+
+
+def test_chunk_contract_heuristics():
+    page1 = ExtractedPage(
+        page_number=1,
+        text="§ 1 Definitions\nStatus: Safe\nThis is definition text.\n\n"
+             "§ 2.3 Non-Compete Restriction\nStatus: Void\nDo not compete.\n\n"
+             "CONFIDENTIALITY\nThis is mutual confidentiality."
+    )
+    extraction = ExtractedContract(
+        contract_name="nda_heuristic.pdf",
+        pages=[page1],
+        status="success",
+    )
+
+    clauses = chunk_contract(extraction)
+    
+    # Expected: 3 clauses
+    # 1. § 1 Definitions (numbered with § symbol)
+    # 2. § 2.3 Non-Compete (numbered sub-clause with § symbol)
+    # 3. CONFIDENTIALITY (unnumbered uppercase header)
+    assert len(clauses) == 3
+    
+    assert clauses[0].clause_number == "1"
+    assert "Definitions" in clauses[0].clause_text
+    
+    assert clauses[1].clause_number == "2.3"
+    assert "Non-Compete" in clauses[1].clause_text
+    
+    assert clauses[2].clause_number == "Confidentiality"
+    assert "This is mutual confidentiality" in clauses[2].clause_text

@@ -77,6 +77,7 @@ class Embedder:
             return_dense=True,
             return_sparse=False,
             return_colbert_vecs=False,
+            verbose=False,
         )
         return output["dense_vecs"].tolist()
 
@@ -95,6 +96,7 @@ class Embedder:
             return_dense=True,
             return_sparse=False,
             return_colbert_vecs=False,
+            verbose=False,
         )
         return output["dense_vecs"][0].tolist()
 
@@ -118,6 +120,7 @@ class Embedder:
             return_dense=True,
             return_sparse=True,
             return_colbert_vecs=False,
+            verbose=False,
         )
 
         dense_vecs = output["dense_vecs"].tolist()

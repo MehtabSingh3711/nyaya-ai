@@ -546,8 +546,9 @@ Langfuse self-hosted in Docker. RAGAS scores attached to traces. Every Mode 2 se
 | [ADR-007](./adr/ADR-007-frontend.md) | Frontend framework + visual standard | Accepted |
 | [ADR-008](./adr/ADR-008-evaluation-framework.md) | Evaluation framework | Accepted |
 | [ADR-009](./adr/ADR-009-observability.md) | Observability and tracing | Accepted |
-| ADR-010 | Deployment strategy | TBD — Week 4/5 |
-| ADR-011 | Upgrade critical statutory sources for amendment currency | Planned — not yet built |
+| [ADR-010](./adr/ADR-010-deployment-strategy.md) | Deployment: HF Docker Space + Qdrant Cloud | Accepted |
+| [ADR-011](./adr/ADR-011-hybrid-retrieval-reinstatement.md) | Hybrid retrieval reinstatement | Accepted |
+| ADR-012 | Amendment metadata schema + admin workflow | Accepted — Week 4 |
 
 ---
 

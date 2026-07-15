@@ -5,22 +5,30 @@ import uuid
 from nyaya_ai.contracts.extractor import ExtractedContract
 from nyaya_ai.schemas import ClauseExtraction
 
-# Pattern to find clause headers at the start of a line.
-# Matches: "1. Scope", "Clause 2.1: Payment", "Section 3. Liability"
-# Number format: 1, 1.1, 2.3.4, etc.
-# CRITICAL: re.MULTILINE is used so ^ matches start of any line.
-CLAUSE_PATTERN = re.compile(
-    r"^(?:Clause|Section)?[ \t]*(\d+(?:\.\d+)*)(?:\.|\:)?[ \t]+",
-    re.MULTILINE | re.IGNORECASE,
+# Heuristic Legal Keywords for detecting unnumbered standalone titles
+LEGAL_KEYWORDS = {
+    "CONFIDENTIAL", "PAYMENT", "TERM", "LIABILITY", "INDEMNITY", 
+    "ARBITRATION", "JURISDICTION", "GOVERNING", "INTELLECTUAL", "IP", 
+    "WARRANTY", "DELIVERY", "MISCELLANEOUS", "DEFINITION", "REPRESENTATION", 
+    "FORCE MAJEURE", "BREACH", "SEVERABILITY", "NOTICE", "WAIVER", "SURVIVAL",
+    "SCOPE", "QUALITY", "TITLE", "SIGNATURE", "WITNESS"
+}
+
+# Regex to match numbered boundaries: "1. Scope", "Clause 2.1: Payment", "§ 2.3 Non-Compete", etc.
+NUMBERED_PATTERN = re.compile(
+    r"^(?:Clause|Section|Article|§)?[ \t]*(\d+(?:\.\d+)*)(?:\.|\:)?[ \t]+",
+    re.IGNORECASE
 )
 
 
 def chunk_contract(extraction: ExtractedContract) -> list[ClauseExtraction]:
     """Split the extracted contract text into structural clauses.
 
-    Determines page number where the clause starts (for PDF) or defaults
-    to 0 (for DOCX). Falls back to paragraph-level splitting if no
-    structural numbering is detected.
+    Combines two strategies:
+    1. Numbered pattern match (Clause X, Section Y, § Z, Article W, or raw numbers).
+    2. Standalone uppercase legal headers (e.g. "CONFIDENTIALITY").
+
+    Falls back to paragraph-level splitting if no headers are detected.
 
     Args:
         extraction: The ExtractedContract result.
@@ -53,14 +61,46 @@ def chunk_contract(extraction: ExtractedContract) -> list[ClauseExtraction]:
                 break
         return current_page
 
-    # 2. Find all clause boundaries
-    matches = list(CLAUSE_PATTERN.finditer(full_text))
+    # 2. Scan line-by-line to identify boundaries
+    boundaries: list[tuple[int, str]] = []  # (char_offset, clause_number)
+    
+    current_offset = 0
+    lines = full_text.splitlines(keepends=True)
 
-    clauses: list[ClauseExtraction] = []
+    for line in lines:
+        line_stripped = line.strip()
+        if not line_stripped:
+            current_offset += len(line)
+            continue
 
-    if not matches:
-        # Fallback to paragraph splitting if no clause numbers detected
+        is_boundary = False
+        clause_num = None
+
+        # Check 1: Numbered legal header
+        regex_match = NUMBERED_PATTERN.match(line_stripped)
+        if regex_match:
+            is_boundary = True
+            clause_num = regex_match.group(1)
+        
+        # Check 2: Standalone uppercase legal header heuristic
+        elif (
+            len(line_stripped) < 60 
+            and line_stripped.isupper() 
+            and any(kw in line_stripped for kw in LEGAL_KEYWORDS)
+            and not line_stripped.endswith((".", ",", ";"))
+        ):
+            is_boundary = True
+            clause_num = line_stripped.title()
+
+        if is_boundary:
+            boundaries.append((current_offset, clause_num))
+
+        current_offset += len(line)
+
+    # 3. Fallback to paragraph splitting if no boundaries detected
+    if not boundaries:
         paragraphs = [p.strip() for p in full_text.split("\n\n") if p.strip()]
+        clauses: list[ClauseExtraction] = []
         for i, p in enumerate(paragraphs, 1):
             idx = full_text.find(p)
             page_num = get_page_number(idx if idx != -1 else 0)
@@ -76,12 +116,11 @@ def chunk_contract(extraction: ExtractedContract) -> list[ClauseExtraction]:
             )
         return clauses
 
-    # 3. Slice the text based on matches
-    for i, match in enumerate(matches):
-        clause_num = match.group(1)
-        start = match.start()
-        end = matches[i + 1].start() if i + 1 < len(matches) else len(full_text)
-
+    # 4. Slice the text based on boundaries
+    clauses: list[ClauseExtraction] = []
+    for i, (start, clause_num) in enumerate(boundaries):
+        end = boundaries[i + 1][0] if i + 1 < len(boundaries) else len(full_text)
+        
         clause_text = full_text[start:end].strip()
         if not clause_text:
             continue

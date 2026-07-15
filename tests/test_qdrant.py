@@ -10,6 +10,9 @@ from types import SimpleNamespace
 
 from nyaya_ai.store.qdrant import (
     create_collection,
+    find_points_by_section,
+    set_payload_bulk,
+    update_point_payload,
     upsert_chunks,
     search,
     get_point_count,
@@ -262,3 +265,88 @@ class TestCollectionParameterization:
         mock_client.get_collection.return_value = SimpleNamespace(points_count=10)
         assert get_point_count("custom_col") == 10
         mock_client.get_collection.assert_called_once_with(collection_name="custom_col")
+
+
+# ===================================================================
+# set_payload_bulk tests
+# ===================================================================
+
+class TestSetPayloadBulk:
+
+    def test_calls_set_payload(self, mock_client):
+        """set_payload_bulk should call client.set_payload."""
+        set_payload_bulk({"amendment_status": "original"})
+        mock_client.set_payload.assert_called_once()
+        call_kwargs = mock_client.set_payload.call_args.kwargs
+        assert call_kwargs["payload"] == {"amendment_status": "original"}
+
+    def test_uses_correct_collection(self, mock_client):
+        set_payload_bulk({"amendment_status": "original"}, collection_name="custom")
+        call_kwargs = mock_client.set_payload.call_args.kwargs
+        assert call_kwargs["collection_name"] == "custom"
+
+
+# ===================================================================
+# find_points_by_section tests
+# ===================================================================
+
+class TestFindPointsBySection:
+
+    def test_returns_matching_points(self, mock_client):
+        """Should return points with id and payload fields."""
+        mock_point = SimpleNamespace(
+            id="abc-123",
+            payload={
+                "act_name": "Indian Contract Act 1872",
+                "section_number": "27",
+                "text": "Every agreement...",
+                "amendment_status": "original",
+            },
+        )
+        mock_client.scroll.return_value = ([mock_point], None)
+
+        results = find_points_by_section("Indian Contract Act", "27")
+
+        assert len(results) == 1
+        assert results[0]["id"] == "abc-123"
+        assert results[0]["act_name"] == "Indian Contract Act 1872"
+        assert results[0]["section_number"] == "27"
+        mock_client.scroll.assert_called_once()
+
+    def test_returns_empty_when_no_match(self, mock_client):
+        mock_client.scroll.return_value = ([], None)
+        results = find_points_by_section("Nonexistent Act", "999")
+        assert results == []
+
+    def test_scroll_uses_correct_filter_keys(self, mock_client):
+        """Verify scroll filter uses act_name and section_number fields."""
+        mock_client.scroll.return_value = ([], None)
+        find_points_by_section("IT Act 2000", "43A")
+
+        call_kwargs = mock_client.scroll.call_args.kwargs
+        scroll_filter = call_kwargs["scroll_filter"]
+        # Verify filter has 2 must conditions
+        assert len(scroll_filter.must) == 2
+
+
+# ===================================================================
+# update_point_payload tests
+# ===================================================================
+
+class TestUpdatePointPayload:
+
+    def test_updates_specific_points(self, mock_client):
+        update_point_payload(
+            ["id-1", "id-2"],
+            {"amendment_status": "amended", "amended_by": "Test Act"},
+        )
+        mock_client.set_payload.assert_called_once()
+        call_kwargs = mock_client.set_payload.call_args.kwargs
+        assert call_kwargs["points"] == ["id-1", "id-2"]
+        assert call_kwargs["payload"]["amendment_status"] == "amended"
+
+    def test_empty_point_ids_is_noop(self, mock_client):
+        """Should not call set_payload when no point IDs provided."""
+        update_point_payload([], {"amendment_status": "amended"})
+        mock_client.set_payload.assert_not_called()
+

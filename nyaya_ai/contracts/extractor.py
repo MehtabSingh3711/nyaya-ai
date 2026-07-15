@@ -120,9 +120,31 @@ def extract_contract_text(file_path: Path) -> ExtractedContract:
                 error_message=f"Failed to parse DOCX: {e}",
             )
 
+    elif suffix == ".txt":
+        try:
+            text = path.read_text(encoding="utf-8")
+            if len(text.strip()) < 10:
+                return ExtractedContract(
+                    contract_name=contract_name,
+                    status="failure",
+                    error_message="Text file is empty or near-empty.",
+                )
+            paragraphs = [p for p in text.strip().split("\n\n") if p.strip()]
+            return ExtractedContract(
+                contract_name=contract_name,
+                paragraphs=paragraphs,
+                status="success",
+            )
+        except Exception as e:
+            return ExtractedContract(
+                contract_name=contract_name,
+                status="failure",
+                error_message=f"Failed to read text file: {e}",
+            )
+
     else:
         return ExtractedContract(
             contract_name=contract_name,
             status="failure",
-            error_message=f"Unsupported file format: {suffix}. Only PDF and DOCX are supported.",
+            error_message=f"Unsupported file format: {suffix}. Only PDF, DOCX, and TXT are supported.",
         )

@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nyaya AI — Legal RAG Research Workstation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet" />
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* === Theme Variables === */
+        :root {
+            --morning-snow: #F5F4ED;
+            --amazon-mist: #ECECDC;
+            --black-kite: #351E1C;
+            --black-kite-15: rgba(53, 30, 28, 0.15);
+            --toxic-orange: #FF6037;
+            --rose-gold: #B66E79;
+            --muted-copper: #8C4E4F;
+            --dark-mahogany: #3B1F1B;
+            --aqua-mist: #A0C9CB;
+            --aqua-mist-soft: rgba(160, 201, 203, 0.22);
+            --garnet: #733635;
+            --blush-pink: #FADADD;
+            --safe-bg: #E2F0D9;
+            --safe-text: #385723;
+            --white: #FFFFFF;
+            /* Helper tokens */
+            --text-secondary: rgba(53, 30, 28, 0.65);
+            --text-muted: rgba(53, 30, 28, 0.40);
+            --surface-hover: rgba(53, 30, 28, 0.03);
+        }
+
+        .dark {
+            --morning-snow: #121214;
+            --amazon-mist: #1A1A1E;
+            --black-kite: #F5F4ED;
+            --black-kite-15: rgba(236, 237, 220, 0.10);
+            --toxic-orange: #FF6037;
+            --rose-gold: #B66E79;
+            --muted-copper: #B66E79;
+            --dark-mahogany: #232329;
+            --aqua-mist: #A0C9CB;
+            --aqua-mist-soft: rgba(160, 201, 203, 0.08);
+            --garnet: #733635;
+            --blush-pink: #FADADD;
+            --safe-bg: #1E3A20;
+            --safe-text: #A3E635;
+            --white: #1A1A1E;
+            /* Helper tokens */
+            --text-secondary: rgba(245, 244, 237, 0.65);
+            --text-muted: rgba(245, 244, 237, 0.40);
+            --surface-hover: rgba(245, 244, 237, 0.04);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--morning-snow);
+            color: var(--black-kite);
+            -webkit-font-smoothing: antialiased;
+            overflow: hidden;
+            /* Prevent body scroll, inner panels will scroll */
+        }
+
+        /* Global smooth transition for theme switch */
+        body,
+        body * {
+            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, fill 0.3s ease, stroke 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .font-display {
+            font-family: 'Outfit', sans-serif;
+            letter-spacing: -0.025em;
+        }
+
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* === Utilities === */
+        .border-kite {
+            border: 1px solid var(--black-kite-15);
+        }
+
+        .border-kite-b {
+            border-bottom: 1px solid var(--black-kite-15);
+        }
+
+        .border-kite-t {
+            border-top: 1px solid var(--black-kite-15);
+        }
+
+        .text-primary {
+            color: var(--black-kite);
+        }
+
+        .text-secondary {
+            color: var(--text-secondary);
+        }
+
+        .text-muted {
+            color: var(--text-muted);
+        }
+
+        .bg-surface {
+            background-color: var(--white);
+        }
+
+        .bg-page {
+            background-color: var(--morning-snow);
+        }
+
+        /* === Theme Toggle === */
+        .theme-toggle {
+            width: 52px;
+            height: 28px;
+            border-radius: 14px;
+            background: var(--amazon-mist);
+            border: 1px solid var(--black-kite-15);
+            position: relative;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .theme-toggle-thumb {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: var(--toxic-orange);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #1A0A05;
+        }
+
+        .dark .theme-toggle-thumb {
+            transform: translateX(24px);
+        }
+
+        /* === Evidence Binder Cards (Left Column) === */
+        .source-card {
+            background: var(--white);
+            border: 1px solid var(--black-kite-15);
+            border-radius: 6px;
+            padding: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .source-card:hover {
+            border-color: var(--text-muted);
+        }
+
+        .source-card.active {
+            border-color: var(--aqua-mist);
+            background: var(--aqua-mist-soft);
+            box-shadow: 0 0 0 1px var(--aqua-mist), 0 4px 12px rgba(160, 201, 203, 0.15);
+        }
+
+        /* === Memorandum Highlights (Center Column) === */
+        .mem-highlight {
+            background: var(--aqua-mist-soft);
+            color: var(--black-kite);
+            border-bottom: 1px dashed var(--aqua-mist);
+            padding: 1px 3px;
+            border-radius: 2px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .mem-highlight:hover {
+            background: var(--aqua-mist);
+            color: var(--morning-snow);
+            /* In light mode this is dark text on light bg */
+        }
+
+        .dark .mem-highlight:hover {
+            color: var(--black-kite);
+            /* In dark mode this is light text on dark bg */
+        }
+
+        /* === Verification Badges === */
+        .badge-verified {
+            background: var(--safe-bg);
+            color: var(--safe-text);
+            border: 1px solid rgba(56, 87, 35, 0.3);
+        }
+
+        .dark .badge-verified {
+            background: rgba(30, 58, 32, 0.4);
+            border: 1px solid rgba(56, 87, 35, 0.5);
+        }
+
+        .badge-unverified {
+            background: #FEF3C7;
+            color: #92400E;
+            border: 1px solid rgba(146, 64, 14, 0.2);
+        }
+
+        .dark .badge-unverified {
+            background: rgba(254, 243, 199, 0.1);
+            color: #FCD34D;
+            border: 1px solid rgba(252, 211, 77, 0.2);
+        }
+
+        /* === Right Column Controls === */
+        .filter-tag {
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 4px;
+            border: 1px solid var(--black-kite-15);
+            color: var(--text-secondary);
+            background: transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-tag.active {
+            background: var(--toxic-orange);
+            color: #1A0A05;
+            border-color: var(--toxic-orange);
+            font-weight: 600;
+        }
+
+        .suggestion-chip {
+            font-size: 11.5px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px dashed var(--black-kite-15);
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+            background: transparent;
+            text-align: left;
+        }
+
+        .suggestion-chip:hover {
+            border-color: var(--toxic-orange);
+            color: var(--toxic-orange);
+            background: var(--aqua-mist-soft);
+        }
+
+        .btn-primary {
+            background: var(--toxic-orange);
+            color: #1A0A05;
+            font-weight: 600;
+            padding: 10px 16px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.2s;
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 4px 12px rgba(255, 96, 55, 0.25);
+        }
+
+        .query-input {
+            width: 100%;
+            background: var(--morning-snow);
+            border: 1px solid var(--black-kite-15);
+            border-radius: 6px;
+            padding: 10px 12px;
+            color: var(--black-kite);
+            font-size: 13px;
+            outline: none;
+            resize: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .query-input:focus {
+            border-color: var(--aqua-mist);
+            box-shadow: 0 0 0 3px var(--aqua-mist-soft);
+        }
+
+        .query-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        /* === Custom Scrollbar === */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--black-kite-15);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+    </style>
+    <script>
+        // Pre-attach class to HTML immediately to prevent flash
+        (function () {
+            try {
+                var saved = localStorage.getItem('nyaya-theme');
+                if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                    document.documentElement.classList.add('dark');
+                }
+            } catch (e) { }
+        })();
+    </script>
+</head>
+
+<body class="flex flex-col h-screen">
+
+    <!-- ==================== HEADER ==================== -->
+    <header class="bg-surface border-kite-b z-30 flex-shrink-0">
+        <div class="px-6 py-3 flex items-center justify-between gap-6">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-md flex items-center justify-center relative overflow-hidden"
+                    style="background: var(--black-kite);">
+                    <div class="absolute inset-0 bg-gradient-to-br from-[var(--rose-gold)]/30 to-transparent"></div>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" class="relative z-10">
+                        <path d="M12 2.5L4 6.2V12C4 16.5 7.4 20.6 12 22C16.6 20.6 20 16.5 20 12V6.2L12 2.5Z"
+                            stroke="#FF6037" stroke-width="1.5" stroke-linejoin="round" />
+                        <path d="M8.5 12L11 14.5L15.5 9.5" stroke="#F5F4ED" stroke-width="1.5" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="font-display font-bold text-lg text-primary leading-none">Nyaya<span
+                            class="text-[var(--toxic-orange)]">.</span>AI</h1>
+                    <p class="text-[10px] text-muted mt-1 font-mono uppercase tracking-wider">Mode 2: Research
+                        Workstation</p>
+                </div>
+            </div>
+
+            <div class="flex-1 max-w-md hidden md:block relative">
+                <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted"></i>
+                <input type="text" placeholder="Search citations, case law, or statutes..." class="query-input"
+                    style="padding-left: 36px;">
+            </div>
+
+            <div class="flex items-center gap-4">
+                <button class="relative text-secondary hover:text-primary">
+                    <i data-lucide="bell" class="w-5 h-5"></i>
+                    <span class="absolute -top-1 -right-1 w-2 h-2 bg-[var(--toxic-orange)] rounded-full"></span>
+                </button>
+                <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+                    <div class="theme-toggle-thumb">
+                        <i data-lucide="sun" class="w-3 h-3 light-icon"></i>
+                        <i data-lucide="moon" class="w-3 h-3 dark-icon hidden"></i>
+                    </div>
+                </button>
+                <div
+                    class="w-9 h-9 rounded-full bg-gradient-to-br from-[var(--rose-gold)] to-[var(--muted-copper)] flex items-center justify-center text-white text-xs font-semibold border border-[var(--black-kite-15)]">
+                    AK</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ==================== MAIN GRID ==================== -->
+    <main class="flex-1 grid grid-cols-1 lg:grid-cols-[300px_1fr_340px] gap-4 p-4 overflow-hidden">
+
+        <!-- ==================== LEFT COLUMN: EVIDENCE BINDER ==================== -->
+        <aside class="bg-surface border-kite rounded-lg flex flex-col overflow-hidden">
+            <div class="p-4 border-kite-b">
+                <h2 class="font-display font-semibold text-sm text-primary flex items-center gap-2">
+                    <i data-lucide="library" class="w-4 h-4 text-[var(--rose-gold)]"></i>
+                    Cited Statutory Authority
+                </h2>
+                <p class="text-xs text-muted mt-1">3 chunks retrieved · Sorted by relevance</p>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-3 space-y-3">
+
+                <!-- Card 1 -->
+                <div class="source-card" data-id="1" onmouseover="highlightSource(1)" onmouseout="clearHighlight()">
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="text-[10px] font-mono text-muted uppercase tracking-wider">Indian Contract Act, 1872
+                        </div>
+                        <div
+                            class="text-[10px] font-mono font-bold text-[var(--rose-gold)] bg-[var(--rose-gold)]/10 px-1.5 py-0.5 rounded">
+                            98% Match</div>
+                    </div>
+                    <h3 class="text-sm font-semibold text-primary mb-2">§ 27. Agreement in restraint of trade, void</h3>
+                    <div class="border-l-2 border-[var(--black-kite-15)] pl-3">
+                        <p class="text-xs text-secondary leading-relaxed">
+                            "An agreement by which any one is restrained from exercising a lawful profession, trade, or
+                            business of any kind, is to that extent void..."
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="source-card" data-id="2" onmouseover="highlightSource(2)" onmouseout="clearHighlight()">
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="text-[10px] font-mono text-muted uppercase tracking-wider">Specific Relief Act, 1963
+                        </div>
+                        <div
+                            class="text-[10px] font-mono font-bold text-[var(--rose-gold)] bg-[var(--rose-gold)]/10 px-1.5 py-0.5 rounded">
+                            91% Match</div>
+                    </div>
+                    <h3 class="text-sm font-semibold text-primary mb-2">§ 27. Preventive relief how granted</h3>
+                    <div class="border-l-2 border-[var(--black-kite-15)] pl-3">
+                        <p class="text-xs text-secondary leading-relaxed">
+                            "Preventive relief is granted at the discretion of the court by injunction, temporary or
+                            perpetual..."
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="source-card" data-id="3" onmouseover="highlightSource(3)" onmouseout="clearHighlight()">
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="text-[10px] font-mono text-muted uppercase tracking-wider">Information Technology
+                            Act, 2000</div>
+                        <div
+                            class="text-[10px] font-mono font-bold text-[var(--rose-gold)] bg-[var(--rose-gold)]/10 px-1.5 py-0.5 rounded">
+                            85% Match</div>
+                    </div>
+                    <h3 class="text-sm font-semibold text-primary mb-2">§ 72A. Punishment for disclosure of information
+                    </h3>
+                    <div class="border-l-2 border-[var(--black-kite-15)] pl-3">
+                        <p class="text-xs text-secondary leading-relaxed">
+                            "Save as otherwise provided in this Act or any other law for the time being in force, any
+                            person including an intermediary..."
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ==================== CENTER COLUMN: MEMORANDUM VIEWER ==================== -->
+        <section class="bg-surface border-kite rounded-lg flex flex-col overflow-hidden">
+
+            <!-- Header -->
+            <div class="p-5 border-kite-b flex justify-between items-center flex-shrink-0">
+                <div>
+                    <h2 class="font-display font-bold text-lg text-primary">Legal Memorandum</h2>
+                    <p class="text-xs text-muted mt-1">Query: "Validity of non-compete clauses in Karnataka" · 14 Nov
+                        2024, 10:32 AM</p>
+                </div>
+                <div
+                    class="badge-verified px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+                    <i data-lucide="check-circle" class="w-3.5 h-3.5"></i>
+                    Verified Citation
+                </div>
+            </div>
+
+            <!-- Scrollable Content -->
+            <div class="flex-1 overflow-y-auto p-8">
+
+                <h1 class="font-display text-3xl font-bold text-primary mb-6 leading-tight">Opinion on Post-Termination
+                    Non-Compete Restraints</h1>
+
+                <!-- Section A -->
+                <div class="mb-8">
+                    <div class="flex items-center gap-2 mb-3">
+                        <div
+                            class="w-6 h-6 rounded bg-[var(--toxic-orange)]/10 text-[var(--toxic-orange)] font-bold text-xs flex items-center justify-center">
+                            A</div>
+                        <h3 class="font-display font-semibold text-sm text-primary uppercase tracking-wider">Executive
+                            Summary</h3>
+                    </div>
+                    <p class="text-sm text-secondary leading-relaxed">
+                        Post-termination non-compete clauses in employment agreements are <strong
+                            class="text-primary">generally void under Section 27</strong> of the Indian Contract Act,
+                        1872. The courts consistently distinguish between restraints during the term of employment
+                        (which are valid) and post-termination restraints (which are void). The only exception is the
+                        sale of goodwill.
+                    </p>
+                </div>
+
+                <!-- Section B -->
+                <div class="mb-8">
+                    <div class="flex items-center gap-2 mb-3">
+                        <div
+                            class="w-6 h-6 rounded bg-[var(--toxic-orange)]/10 text-[var(--toxic-orange)] font-bold text-xs flex items-center justify-center">
+                            B</div>
+                        <h3 class="font-display font-semibold text-sm text-primary uppercase tracking-wider">Statutory
+                            Analysis</h3>
+                    </div>
+                    <p class="text-sm text-secondary leading-relaxed mb-4">
+                        The primary statutory hurdle is <span class="mem-highlight" data-source="1"
+                            onmouseover="highlightSource(1)" onmouseout="clearHighlight()">Section 27 of the Indian
+                            Contract Act, 1872</span>, which expressly declares agreements in restraint of trade as
+                        void. Unlike jurisdictions that apply a "reasonableness" test, Indian courts strictly adhere to
+                        the statutory language.
+                    </p>
+                    <p class="text-sm text-secondary leading-relaxed mb-4">
+                        However, courts have interpreted this to mean that <span class="mem-highlight" data-source="2"
+                            onmouseover="highlightSource(2)" onmouseout="clearHighlight()">negative covenants during the
+                            term of employment</span> are valid, as they do not operate as a restraint of trade but
+                        rather protect the employer's legitimate business interests. The distinction lies in whether the
+                        restraint operates during or after the termination of the contract.
+                    </p>
+                    <p class="text-sm text-secondary leading-relaxed">
+                        Furthermore, if the agreement involves handling sensitive data, <span class="mem-highlight"
+                            data-source="3" onmouseover="highlightSource(3)" onmouseout="clearHighlight()">Section 72A
+                            of the IT Act, 2000</span> provides penal consequences for disclosure, but does not validate
+                        a broader non-compete restraint.
+                    </p>
+                </div>
+
+            </div>
+
+            <!-- Footer -->
+            <div class="p-5 border-kite-t flex items-center justify-between flex-shrink-0 bg-[var(--amazon-mist)]/30">
+                <div class="flex items-center gap-4">
+                    <div class="relative w-12 h-12">
+                        <svg viewBox="0 0 36 36" class="w-full h-full -rotate-90">
+                            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="var(--black-kite-15)"
+                                stroke-width="3" />
+                            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="var(--rose-gold)" stroke-width="3"
+                                stroke-dasharray="92, 100" stroke-linecap="round" />
+                        </svg>
+                        <div
+                            class="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-primary font-mono">
+                            92%</div>
+                    </div>
+                    <div>
+                        <div class="text-sm font-semibold text-primary">Citation Confidence</div>
+                        <div class="text-xs text-muted">High correlation with retrieved sources</div>
+                    </div>
+                </div>
+                <button class="text-xs font-medium text-[var(--toxic-orange)] hover:underline flex items-center gap-1">
+                    Export Memorandum <i data-lucide="download" class="w-3 h-3"></i>
+                </button>
+            </div>
+        </section>
+
+        <!-- ==================== RIGHT COLUMN: QUERY CONTROL ==================== -->
+        <aside class="flex flex-col gap-4 overflow-hidden">
+
+            <!-- Search Scope Filters -->
+            <div class="bg-surface border-kite rounded-lg p-4 flex-shrink-0">
+                <div class="flex items-center gap-2 mb-3">
+                    <i data-lucide="filter" class="w-4 h-4 text-muted"></i>
+                    <h3 class="font-display font-semibold text-sm text-primary">Restrict Search To</h3>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button class="filter-tag active">Indian Contract Act</button>
+                    <button class="filter-tag">MSME Act</button>
+                    <button class="filter-tag">Specific Relief Act</button>
+                    <button class="filter-tag">IT Act</button>
+                </div>
+            </div>
+
+            <!-- Chat History Stream -->
+            <div class="bg-surface border-kite rounded-lg p-4 flex-1 overflow-y-auto">
+                <div class="flex items-center gap-2 mb-4">
+                    <i data-lucide="history" class="w-4 h-4 text-muted"></i>
+                    <h3 class="font-display font-semibold text-sm text-primary">Query History</h3>
+                </div>
+
+                <div class="space-y-3">
+                    <div
+                        class="p-3 rounded-md border-kite bg-[var(--morning-snow)] cursor-pointer hover:bg-[var(--amazon-mist)] transition-colors">
+                        <p class="text-xs font-medium text-primary mb-1">Validity of non-compete in Karnataka</p>
+                        <p class="text-[10px] text-muted font-mono">10:32 AM · Today</p>
+                    </div>
+                    <div
+                        class="p-3 rounded-md border-kite cursor-pointer hover:bg-[var(--amazon-mist)] transition-colors">
+                        <p class="text-xs font-medium text-primary mb-1">MSME Act Section 15 timeline</p>
+                        <p class="text-[10px] text-muted font-mono">09:15 AM · Today</p>
+                    </div>
+                    <div
+                        class="p-3 rounded-md border-kite cursor-pointer hover:bg-[var(--amazon-mist)] transition-colors">
+                        <p class="text-xs font-medium text-primary mb-1">Stamp duty for rental in Bengaluru</p>
+                        <p class="text-[10px] text-muted font-mono">04:45 PM · Yesterday</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Query Input Area -->
+            <div class="bg-surface border-kite rounded-lg p-4 flex-shrink-0">
+
+                <!-- Suggestions -->
+                <div class="mb-4">
+                    <p class="text-[10px] font-bold uppercase tracking-wider text-muted mb-2">Legal Follow-ups</p>
+                    <div class="flex flex-col gap-2">
+                        <button class="suggestion-chip">What is the penalty for violating this section?</button>
+                        <button class="suggestion-chip">How does this apply to NDAs specifically?</button>
+                    </div>
+                </div>
+
+                <!-- Textarea & Button -->
+                <div class="relative">
+                    <textarea class="query-input" rows="3" placeholder="Enter your legal query..."></textarea>
+                    <button class="btn-primary absolute bottom-3 right-3 text-xs flex items-center gap-1.5">
+                        Consult AI <i data-lucide="sparkles" class="w-3 h-3"></i>
+                    </button>
+                </div>
+            </div>
+
+        </aside>
+    </main>
+
+    <script>
+        // Initialize Lucide Icons
+        try {
+            lucide.createIcons();
+        } catch (e) { }
+
+        // Theme Toggle Logic
+        function toggleTheme() {
+            document.documentElement.classList.toggle('dark');
+            try {
+                var isDark = document.documentElement.classList.contains('dark');
+                localStorage.setItem('nyaya-theme', isDark ? 'dark' : 'light');
+            } catch (e) { }
+            updateThemeIcons();
+        }
+
+        function updateThemeIcons() {
+            var isDark = document.documentElement.classList.contains('dark');
+            var lights = document.querySelectorAll('.light-icon');
+            var darks = document.querySelectorAll('.dark-icon');
+            for (var i = 0; i < lights.length; i++) {
+                lights[i].classList.toggle('hidden', isDark);
+            }
+            for (var j = 0; j < darks.length; j++) {
+                darks[j].classList.toggle('hidden', !isDark);
+            }
+        }
+        updateThemeIcons();
+
+        // RAG Highlight Sync Logic
+        function highlightSource(id) {
+            var cards = document.querySelectorAll('.source-card');
+            cards.forEach(function (card) {
+                if (card.dataset.id === String(id)) {
+                    card.classList.add('active');
+                } else {
+                    card.classList.remove('active');
+                }
+            });
+        }
+
+        function clearHighlight() {
+            var cards = document.querySelectorAll('.source-card');
+            cards.forEach(function (card) {
+                card.classList.remove('active');
+            });
+        }
+    </script>
+</body>
+
+</html>

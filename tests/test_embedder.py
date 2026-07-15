@@ -30,6 +30,8 @@ def mock_embedder():
             return_dense=True,
             return_sparse=False,
             return_colbert_vecs=False,
+            verbose=True,
+            **kwargs,
         ):
             n = len(texts) if isinstance(texts, list) else 1
             result = {}

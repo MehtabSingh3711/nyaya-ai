@@ -1,15 +1,20 @@
 """Cross-encoder reranker for Nyaya AI (ADR-002, ADR-011).
 
-Loads bge-reranker-v2-m3 as a cross-encoder that reads the full
+Loads jina-reranker-v1-turbo-en as an ONNX cross-encoder that reads the full
 (query, candidate) pair jointly. This is significantly more accurate
 than comparing pre-computed embeddings, and is the key to filtering
 out false-positive-adjacent noise (e.g., "Hire Purchase Act" matching
 instead of the actual relevant statute).
 
+We use jinaai/jina-reranker-v1-turbo-en (150MB, Apache 2.0). It provides
+a native 8K context length (compared to BGE's 512 tokens), preventing
+truncation of long legal sections, while executing in milliseconds on local CPU
+using FastEmbed's ONNX runtime.
+
 Pipeline position:
     Hybrid search (dense + sparse, RRF) → top-20 candidates
     → Reranker (this module) → top-5 reranked candidates
-    → LLM cascade
+    └─ LLM cascade
 """
 
 from __future__ import annotations
@@ -22,9 +27,9 @@ console = Console()
 
 
 class Reranker:
-    """Cross-encoder reranker using bge-reranker-v2-m3.
+    """Cross-encoder reranker using jina-reranker-v1-turbo-en.
 
-    Loads the model on first instantiation. Downloads ~560 MB on first run
+    Loads the model on first instantiation. Downloads ~150 MB on first run
     (cached by HuggingFace).
 
     Usage:
@@ -37,14 +42,14 @@ class Reranker:
     """
 
     def __init__(self) -> None:
-        from sentence_transformers import CrossEncoder
+        from fastembed.rerank.cross_encoder import TextCrossEncoder
 
         console.print(
-            f"[bold blue]Loading reranker: {RERANKER_MODEL}...[/]\n"
+            f"[bold blue]Loading ONNX reranker: {RERANKER_MODEL}...[/]\n"
             f"  (First run downloads model — cached for future runs)"
         )
-        self._model = CrossEncoder(RERANKER_MODEL)
-        console.print("[green]  Reranker loaded.[/]")
+        self._model = TextCrossEncoder(model_name=RERANKER_MODEL)
+        console.print("[green]  ONNX Reranker loaded.[/]")
 
     def rerank(
         self,
@@ -53,7 +58,7 @@ class Reranker:
         top_k: int = 5,
         text_key: str = "text",
     ) -> list[dict]:
-        """Rerank candidates using cross-encoder scoring.
+        """Rerank candidates using cross-encoder scoring via FastEmbed (ONNX).
 
         Each candidate dict must contain a text field (default key: "text")
         that will be paired with the query for cross-encoder scoring.
@@ -73,20 +78,19 @@ class Reranker:
         if not candidates:
             return []
 
-        # Build (query, candidate_text) pairs for cross-encoder
-        pairs = []
+        # Build prefixed document texts to provide richer context to cross-encoder
+        prefixed_texts = []
         for cand in candidates:
             cand_text = cand.get(text_key, "")
-            # Include act_name and section_number for richer context
             act = cand.get("act_name", "")
             section = cand.get("section_number", "")
             prefix = f"{act} Section {section}: " if act else ""
-            pairs.append((query, f"{prefix}{cand_text}"))
+            prefixed_texts.append(f"{prefix}{cand_text}")
 
-        # Score all pairs
-        scores = self._model.predict(pairs)
+        # Score using FastEmbed's ONNX reranker (returns float scores in original order)
+        scores = list(self._model.rerank(query=query, documents=prefixed_texts))
 
-        # Attach rerank_score to each candidate
+        # Map scores back to original candidate dicts
         scored_candidates = []
         for cand, score in zip(candidates, scores):
             enriched = dict(cand)

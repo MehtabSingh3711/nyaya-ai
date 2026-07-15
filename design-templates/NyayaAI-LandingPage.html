@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Nyaya AI — Know what you sign.</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  /* === Theme Variables (Exact mapping provided) === */
+  :root {
+    --morning-snow: #F5F4ED;
+    --amazon-mist: #ECECDC;
+    --black-kite: #351E1C;
+    --black-kite-15: rgba(53, 30, 28, 0.15);
+    --toxic-orange: #FF6037;
+    --rose-gold: #B66E79;
+    --muted-copper: #8C4E4F;
+    --dark-mahogany: #3B1F1B;
+    --aqua-mist: #A0C9CB;
+    --aqua-mist-soft: rgba(160, 201, 203, 0.22);
+    --garnet: #733635;
+    --blush-pink: #FADADD;
+    --safe-bg: #E2F0D9;
+    --safe-text: #385723;
+    --white: #FFFFFF;
+    --text-secondary: rgba(53, 30, 28, 0.62);
+    --text-muted: rgba(53, 30, 28, 0.40);
+    --surface-hover: rgba(53, 30, 28, 0.03);
+  }
+  .dark {
+    --morning-snow: #121214;
+    --amazon-mist: #1A1A1E;
+    --black-kite: #F5F4ED;
+    --black-kite-15: rgba(236, 237, 220, 0.10);
+    --toxic-orange: #FF6037;
+    --rose-gold: #B66E79;
+    --muted-copper: #B66E79;
+    --dark-mahogany: #232329;
+    --aqua-mist: #A0C9CB;
+    --aqua-mist-soft: rgba(160, 201, 203, 0.08);
+    --garnet: #733635;
+    --blush-pink: #FADADD;
+    --safe-bg: #1E3A20;
+    --safe-text: #A3E635;
+    --white: #1A1A1E;
+    --text-secondary: rgba(245, 244, 237, 0.60);
+    --text-muted: rgba(245, 244, 237, 0.38);
+    --surface-hover: rgba(245, 244, 237, 0.04);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--morning-snow);
+    color: var(--black-kite);
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* Smooth theme transition globally */
+  body, body * {
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, fill 0.3s ease, stroke 0.3s ease;
+  }
+
+  .font-display { font-family: 'Outfit', sans-serif; letter-spacing: -0.025em; }
+  .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+  /* === Border Utility === */
+  .border-kite { border: 1px solid var(--black-kite-15); }
+  .border-kite-t { border-top: 1px solid var(--black-kite-15); }
+  .border-kite-b { border-bottom: 1px solid var(--black-kite-15); }
+  .border-kite-r { border-right: 1px solid var(--black-kite-15); }
+  .border-kite-l { border-left: 1px solid var(--black-kite-15); }
+
+  /* === Text Helpers === */
+  .text-primary { color: var(--black-kite); }
+  .text-secondary { color: var(--text-secondary); }
+  .text-muted { color: var(--text-muted); }
+  .text-accent { color: var(--toxic-orange); }
+  .text-rose { color: var(--rose-gold); }
+  .bg-surface { background-color: var(--white); }
+  .bg-page { background-color: var(--morning-snow); }
+  .bg-mist { background-color: var(--amazon-mist); }
+
+  /* === Dot Pattern === */
+  .dot-pattern {
+    background-image: radial-gradient(circle, var(--black-kite-15) 1px, transparent 1px);
+    background-size: 28px 28px;
+    opacity: 0.5;
+  }
+
+  /* === Buttons === */
+  .btn-primary {
+    background: var(--toxic-orange);
+    color: #1A0A05;
+    font-weight: 600;
+    transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .btn-primary:hover {
+    background: #FF7855;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(255, 96, 55, 0.25);
+  }
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--black-kite-15);
+    color: var(--black-kite);
+    font-weight: 500;
+    transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+  }
+  .btn-outline:hover {
+    background: var(--surface-hover);
+    border-color: var(--black-kite);
+    transform: translateY(-1px);
+  }
+
+  /* === Navbar === */
+  nav.scrolled {
+    background: color-mix(in srgb, var(--morning-snow) 80%, transparent);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--black-kite-15);
+  }
+
+  /* === Theme Toggle === */
+  .theme-toggle {
+    width: 52px;
+    height: 28px;
+    border-radius: 14px;
+    background: var(--amazon-mist);
+    border: 1px solid var(--black-kite-15);
+    position: relative;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .theme-toggle-thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--toxic-orange);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #1A0A05;
+  }
+  .dark .theme-toggle-thumb {
+    transform: translateX(24px);
+  }
+
+  /* === Floating Tags === */
+  @keyframes float-tag {
+    0%, 100% { transform: translateY(0) rotate(var(--rot, 0deg)); }
+    50% { transform: translateY(-8px) rotate(var(--rot, 0deg)); }
+  }
+  .float-tag {
+    animation: float-tag 4s ease-in-out infinite;
+  }
+
+  /* === Risk Badges === */
+  .risk-high {
+    background: var(--garnet);
+    color: #FF785A;
+    border: 1px solid rgba(115, 54, 53, 0.5);
+  }
+  .dark .risk-high {
+    background: rgba(115, 54, 53, 0.3);
+    color: #FF785A;
+    border: 1px solid rgba(115, 54, 53, 0.6);
+  }
+  .risk-medium {
+    background: rgba(182, 110, 121, 0.18);
+    color: var(--muted-copper);
+    border: 1px solid rgba(182, 110, 121, 0.35);
+  }
+  .dark .risk-medium {
+    background: rgba(182, 110, 121, 0.2);
+    color: var(--blush-pink);
+    border: 1px solid rgba(182, 110, 121, 0.45);
+  }
+  .risk-safe {
+    background: var(--safe-bg);
+    color: var(--safe-text);
+    border: 1px solid rgba(56, 87, 35, 0.3);
+  }
+  .dark .risk-safe {
+    background: rgba(30, 58, 32, 0.4);
+    color: var(--safe-text);
+    border: 1px solid rgba(56, 87, 35, 0.5);
+  }
+
+  /* === Feature Cards === */
+  .feature-card {
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.25s ease, border-color 0.25s ease;
+  }
+  .feature-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--toxic-orange);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .feature-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--black-kite);
+  }
+  .feature-card:hover::before {
+    transform: scaleX(1);
+  }
+  .feature-card .feature-icon {
+    transition: transform 0.25s ease, color 0.25s ease;
+  }
+  .feature-card:hover .feature-icon {
+    transform: scale(1.1);
+    color: var(--toxic-orange);
+  }
+
+  /* === Hero Load Animations (Pure CSS, no JS dependency) === */
+  @keyframes hero-fade-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .hero-anim-1 { opacity: 0; animation: hero-fade-up 0.8s ease-out 0.1s forwards; }
+  .hero-anim-2 { opacity: 0; animation: hero-fade-up 0.8s ease-out 0.25s forwards; }
+  .hero-anim-3 { opacity: 0; animation: hero-fade-up 0.8s ease-out 0.4s forwards; }
+  .hero-anim-4 { opacity: 0; animation: hero-fade-up 0.8s ease-out 0.55s forwards; }
+  .hero-anim-5 { opacity: 0; animation: hero-fade-up 0.8s ease-out 0.7s forwards; }
+
+  /* === Scroll Reveal (Safe with fallback) === */
+  .reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+  }
+  .reveal.in-view {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* === Mockup Elements === */
+  @keyframes scan-beam {
+    0% { transform: translateY(-20px); opacity: 0; }
+    15% { opacity: 0.5; }
+    85% { opacity: 0.5; }
+    100% { transform: translateY(320px); opacity: 0; }
+  }
+  .scan-beam { animation: scan-beam 5s ease-in-out infinite; }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.7); }
+  }
+  .pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+
+  @keyframes blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+  }
+  .cursor-blink { animation: blink 1.2s step-end infinite; }
+
+  .hero-accent {
+    position: relative;
+    display: inline-block;
+  }
+  .hero-accent::after {
+    content: '';
+    position: absolute;
+    bottom: 0.08em;
+    left: 0;
+    right: 0;
+    height: 0.12em;
+    background: var(--toxic-orange);
+    opacity: 0.9;
+    transform: scaleX(0);
+    transform-origin: left;
+    animation: underline-grow 1.2s cubic-bezier(0.4, 0, 0.2, 1) 1s forwards;
+  }
+  @keyframes underline-grow {
+    to { transform: scaleX(1); }
+  }
+
+  @keyframes draw-dial {
+    from { stroke-dashoffset: 326.7; }
+    to { stroke-dashoffset: 16.3; }
+  }
+  .dial-progress { animation: draw-dial 2s cubic-bezier(0.4, 0, 0.2, 1) 1.5s forwards; stroke-dashoffset: 326.7; }
+
+  ::selection { background: var(--aqua-mist-soft); color: var(--black-kite); }
+
+  .mock-doc {
+    font-size: 10px;
+    line-height: 1.65;
+    color: var(--text-secondary);
+  }
+  .mock-doc strong { color: var(--black-kite); font-weight: 600; }
+  .mock-highlight {
+    background: rgba(255, 96, 55, 0.12);
+    color: #FF785A;
+    padding: 0 3px;
+    border-radius: 2px;
+    border-bottom: 1px dashed var(--toxic-orange);
+    font-weight: 600;
+  }
+</style>
+<!-- Pre-attach class to HTML immediately to prevent flash, but provide fallback -->
+<script>
+  // Apply saved theme immediately
+  (function() {
+    try {
+      var saved = localStorage.getItem('nyaya-theme');
+      if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+      }
+    } catch (e) {}
+  })();
+</script>
+</head>
+<body>
+
+<!-- ==================== NAVBAR ==================== -->
+<nav class="fixed top-0 left-0 right-0 z-50" id="navbar">
+  <div class="max-w-7xl mx-auto px-5 sm:px-8">
+    <div class="h-16 flex items-center justify-between">
+      <!-- Logo -->
+      <a href="#" class="flex items-center gap-2.5 group">
+        <div class="w-9 h-9 rounded-md flex items-center justify-center relative overflow-hidden" style="background: var(--black-kite);">
+          <div class="absolute inset-0 bg-gradient-to-br from-[var(--rose-gold)]/30 via-transparent to-transparent"></div>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" class="relative z-10">
+            <path d="M12 2.5L4 6.2V12C4 16.5 7.4 20.6 12 22C16.6 20.6 20 16.5 20 12V6.2L12 2.5Z" stroke="#FF6037" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M8.5 12L11 14.5L15.5 9.5" stroke="#F5F4ED" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div>
+          <div class="font-display font-bold text-[16px] tracking-tight text-primary leading-none">Nyaya<span class="text-[var(--toxic-orange)]">.</span>AI</div>
+          <div class="text-[8.5px] uppercase tracking-[0.18em] text-muted mt-1 font-medium">Contract Intelligence</div>
+        </div>
+      </a>
+
+      <!-- Center links -->
+      <div class="hidden md:flex items-center gap-1">
+        <a href="#features" class="px-3 py-2 text-[13px] font-medium text-secondary hover:text-primary rounded-md">Features</a>
+        <a href="#pricing" class="px-3 py-2 text-[13px] font-medium text-secondary hover:text-primary rounded-md">Pricing</a>
+        <a href="#security" class="px-3 py-2 text-[13px] font-medium text-secondary hover:text-primary rounded-md">Security</a>
+        <a href="#preview" class="px-3 py-2 text-[13px] font-medium text-secondary hover:text-primary rounded-md">Preview</a>
+      </div>
+
+      <!-- Right actions -->
+      <div class="flex items-center gap-3">
+        <!-- Theme toggle -->
+        <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+          <div class="theme-toggle-thumb">
+            <i data-lucide="sun" class="w-3 h-3 light-icon"></i>
+            <i data-lucide="moon" class="w-3 h-3 dark-icon hidden"></i>
+          </div>
+        </button>
+
+        <button class="hidden sm:flex items-center gap-1.5 px-3 py-2 text-[13px] font-medium text-secondary hover:text-primary">
+          <i data-lucide="log-in" class="w-3.5 h-3.5"></i>
+          Sign in
+        </button>
+
+        <a href="#" class="btn-primary px-4 py-2 rounded-md text-[13px] flex items-center gap-1.5">
+          Enter Dashboard
+          <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- ==================== HERO ==================== -->
+<section class="relative pt-32 pb-20 lg:pt-40 lg:pb-28 overflow-hidden">
+  <div class="absolute inset-0 dot-pattern pointer-events-none"></div>
+  <div class="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-b from-transparent to-[var(--morning-snow)] pointer-events-none"></div>
+
+  <div class="relative max-w-5xl mx-auto px-5 sm:px-8 text-center">
+    <!-- Floating tags -->
+    <div class="hidden lg:block">
+      <div class="float-tag absolute -left-4 top-8 hero-anim-1" style="--rot: -4deg; animation-delay: 0s, 0.1s;">
+        <div class="risk-high px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-lg">
+          <i data-lucide="alert-triangle" class="w-3 h-3"></i>
+          § 2.3 VOID · ICA §27
+        </div>
+      </div>
+      <div class="float-tag absolute right-0 top-16 hero-anim-1" style="--rot: 3deg; animation-delay: 1.5s, 0.2s;">
+        <div class="risk-medium px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-lg">
+          <i data-lucide="clock" class="w-3 h-3"></i>
+          § 4.1 REVIEW · MSME §15
+        </div>
+      </div>
+      <div class="float-tag absolute -left-8 bottom-32 hero-anim-1" style="--rot: 2deg; animation-delay: 2.5s, 0.3s;">
+        <div class="risk-safe px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-lg">
+          <i data-lucide="check-circle-2" class="w-3 h-3"></i>
+          § 1.0 COMPLIANT
+        </div>
+      </div>
+      <div class="float-tag absolute right-4 bottom-20 hero-anim-1" style="--rot: -2deg; animation-delay: 0.8s, 0.4s;">
+        <div class="bg-surface border-kite px-3 py-1.5 rounded-md text-[10px] font-mono font-semibold text-primary flex items-center gap-1.5 shadow-lg">
+          <span class="w-1.5 h-1.5 rounded-full bg-[var(--toxic-orange)] pulse-dot"></span>
+          95% confidence
+        </div>
+      </div>
+    </div>
+
+    <!-- Eyebrow -->
+    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border-kite bg-surface mb-8 hero-anim-1">
+      <span class="w-1.5 h-1.5 rounded-full bg-[var(--safe-text)] pulse-dot"></span>
+      <span class="text-[11px] font-medium text-secondary uppercase tracking-[0.15em]">Indian Legal Contract Intelligence</span>
+    </div>
+
+    <!-- Title -->
+    <h1 class="font-display font-bold text-primary leading-[0.95] tracking-tighter hero-anim-2" style="font-size: clamp(48px, 9vw, 104px);">
+      Know what<br>
+      you <span class="hero-accent">sign</span><span class="text-[var(--toxic-orange)]">.</span><span class="cursor-blink text-[var(--toxic-orange)] font-thin">|</span>
+    </h1>
+
+    <!-- Description -->
+    <p class="mt-8 text-[17px] sm:text-[19px] text-secondary leading-relaxed max-w-2xl mx-auto hero-anim-3">
+      Nyaya AI analyzes Indian legal contracts in seconds — detecting void clauses, statutory violations under <span class="font-mono text-primary font-medium">ICA §27</span>, <span class="font-mono text-primary font-medium">MSME Act §15</span>, and compliance risks before you sign.
+    </p>
+
+    <!-- CTAs -->
+    <div class="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3 hero-anim-4">
+      <a href="#" class="btn-primary px-7 py-3.5 rounded-md text-[14px] flex items-center gap-2 w-full sm:w-auto justify-center">
+        <i data-lucide="scan-line" class="w-4 h-4"></i>
+        Scan a Contract
+      </a>
+      <a href="#" class="btn-outline px-7 py-3.5 rounded-md text-[14px] flex items-center gap-2 w-full sm:w-auto justify-center">
+        <i data-lucide="sparkles" class="w-4 h-4 text-[var(--rose-gold)]"></i>
+        Ask Legal AI
+      </a>
+    </div>
+
+    <!-- Stats row -->
+    <div class="mt-16 flex items-center justify-center gap-6 sm:gap-12 hero-anim-5">
+      <div class="text-center">
+        <div class="font-display font-bold text-[28px] sm:text-[32px] text-primary tnum leading-none">10K<span class="text-[var(--toxic-orange)]">+</span></div>
+        <div class="text-[10px] uppercase tracking-wider text-muted mt-2 font-medium">Contracts scanned</div>
+      </div>
+      <div class="w-px h-10 bg-[var(--black-kite-15)]"></div>
+      <div class="text-center">
+        <div class="font-display font-bold text-[28px] sm:text-[32px] text-primary tnum leading-none">50<span class="text-[var(--toxic-orange)]">+</span></div>
+        <div class="text-[10px] uppercase tracking-wider text-muted mt-2 font-medium">Indian statutes</div>
+      </div>
+      <div class="w-px h-10 bg-[var(--black-kite-15)]"></div>
+      <div class="text-center">
+        <div class="font-display font-bold text-[28px] sm:text-[32px] text-primary tnum leading-none">95<span class="text-[var(--toxic-orange)]">%</span></div>
+        <div class="text-[10px] uppercase tracking-wider text-muted mt-2 font-medium">Scan confidence</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== FEATURES ==================== -->
+<section id="features" class="relative py-20 lg:py-28">
+  <div class="max-w-7xl mx-auto px-5 sm:px-8">
+    <div class="max-w-2xl mb-14 reveal">
+      <div class="flex items-center gap-2 mb-4">
+        <div class="h-px w-8 bg-[var(--toxic-orange)]"></div>
+        <span class="text-[11px] font-mono font-semibold uppercase tracking-[0.2em] text-[var(--toxic-orange)]">01 — Capabilities</span>
+      </div>
+      <h2 class="font-display font-bold text-primary tracking-tight leading-[1.05]" style="font-size: clamp(32px, 5vw, 52px);">
+        Statutory intelligence<br>built for Indian law.
+      </h2>
+      <p class="mt-5 text-[16px] text-secondary leading-relaxed">
+        Not a generic LLM wrapper. Nyaya AI is trained on Indian statutes, case law, and regulatory frameworks — purpose-built for the contracts you actually sign.
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <!-- F1 -->
+      <div class="feature-card bg-surface border-kite rounded-lg p-7 reveal">
+        <div class="flex items-start justify-between mb-6">
+          <div class="w-11 h-11 rounded-md flex items-center justify-center feature-icon" style="background: rgba(115, 54, 53, 0.1); border: 1px solid rgba(115, 54, 53, 0.2); color: var(--garnet);">
+            <i data-lucide="shield-alert" class="w-5 h-5"></i>
+          </div>
+          <span class="text-[10px] font-mono text-muted">F1</span>
+        </div>
+        <div class="text-[10px] font-mono font-semibold uppercase tracking-wider mb-2" style="color: var(--garnet);">§ 27 · Indian Contract Act, 1872</div>
+        <h3 class="font-display font-semibold text-[20px] text-primary leading-tight mb-3">Restraint of Trade Detection</h3>
+        <p class="text-[13.5px] text-secondary leading-relaxed mb-6">
+          Automatically flags non-compete and restraint-of-trade clauses that are void under Section 27. References <em>Niranjan Golikari v. Century Spinning (1967)</em> and distinguishes reasonable restrictions during employment from unenforceable post-term restraints.
+        </p>
+        <div class="pt-5 border-kite-t flex items-center justify-between">
+          <div class="risk-high px-2.5 py-1 rounded text-[9px] font-bold uppercase tracking-wider flex items-center gap-1">
+            <i data-lucide="alert-triangle" class="w-2.5 h-2.5"></i>
+            Void · ICA §27
+          </div>
+          <span class="text-[11px] font-mono text-muted">5-year non-compete</span>
+        </div>
+      </div>
+
+      <!-- F2 -->
+      <div class="feature-card bg-surface border-kite rounded-lg p-7 reveal" style="transition-delay: 0.1s;">
+        <div class="flex items-start justify-between mb-6">
+          <div class="w-11 h-11 rounded-md flex items-center justify-center feature-icon" style="background: rgba(182, 110, 121, 0.1); border: 1px solid rgba(182, 110, 121, 0.25); color: var(--rose-gold);">
+            <i data-lucide="receipt" class="w-5 h-5"></i>
+          </div>
+          <span class="text-[10px] font-mono text-muted">F2</span>
+        </div>
+        <div class="text-[10px] font-mono font-semibold uppercase tracking-wider mb-2" style="color: var(--rose-gold);">§ 15 · MSME Development Act, 2006</div>
+        <h3 class="font-display font-semibold text-[20px] text-primary leading-tight mb-3">Payment Term Violations</h3>
+        <p class="text-[13.5px] text-secondary leading-relaxed mb-6">
+          Detects payment cycles exceeding the statutory 45-day limit for MSME suppliers. Calculates compound interest exposure under §16 and flags liability restrictions under §17 — before you incur penal interest.
+        </p>
+        <div class="pt-5 border-kite-t flex items-center justify-between">
+          <div class="risk-medium px-2.5 py-1 rounded text-[9px] font-bold uppercase tracking-wider flex items-center gap-1">
+            <i data-lucide="clock" class="w-2.5 h-2.5"></i>
+            Review · MSME §15
+          </div>
+          <span class="text-[11px] font-mono text-muted">90-day → 45-day</span>
+        </div>
+      </div>
+
+      <!-- F3 -->
+      <div class="feature-card bg-surface border-kite rounded-lg p-7 reveal" style="transition-delay: 0.2s;">
+        <div class="flex items-start justify-between mb-6">
+          <div class="w-11 h-11 rounded-md flex items-center justify-center feature-icon" style="background: rgba(160, 201, 203, 0.15); border: 1px solid rgba(160, 201, 203, 0.3); color: var(--aqua-mist);">
+            <i data-lucide="search" class="w-5 h-5"></i>
+          </div>
+          <span class="text-[10px] font-mono text-muted">F3</span>
+        </div>
+        <div class="text-[10px] font-mono font-semibold uppercase tracking-wider mb-2" style="color: var(--aqua-mist);">RAG · 50+ Statutes · Case Law</div>
+        <h3 class="font-display font-semibold text-[20px] text-primary leading-tight mb-3">Statutory RAG Search</h3>
+        <p class="text-[13.5px] text-secondary leading-relaxed mb-6">
+          Query across Indian statutes, bare acts, and precedent judgments using retrieval-augmented generation. Get cited answers — not hallucinated summaries — with section references and case law provenance.
+        </p>
+        <div class="pt-5 border-kite-t flex items-center justify-between">
+          <div class="risk-safe px-2.5 py-1 rounded text-[9px] font-bold uppercase tracking-wider flex items-center gap-1">
+            <i data-lucide="check-circle-2" class="w-2.5 h-2.5"></i>
+            Cited · Verified
+          </div>
+          <span class="text-[11px] font-mono text-muted">4 statutes matched</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== VISUAL PREVIEW ==================== -->
+<section id="preview" class="relative py-20 lg:py-28 border-kite-t">
+  <div class="max-w-7xl mx-auto px-5 sm:px-8">
+    <div class="max-w-2xl mb-14 reveal">
+      <div class="flex items-center gap-2 mb-4">
+        <div class="h-px w-8 bg-[var(--toxic-orange)]"></div>
+        <span class="text-[11px] font-mono font-semibold uppercase tracking-[0.2em] text-[var(--toxic-orange)]">02 — Live Preview</span>
+      </div>
+      <h2 class="font-display font-bold text-primary tracking-tight leading-[1.05]" style="font-size: clamp(32px, 5vw, 52px);">
+        The dashboard,<br>in action.
+      </h2>
+      <p class="mt-5 text-[16px] text-secondary leading-relaxed">
+        A live scan of an NDA between TechNova Solutions and Vertex Analytics — 10 clauses analyzed, 5 risks detected, 4 statutes matched. This is what your screen looks like.
+      </p>
+    </div>
+
+    <div class="reveal">
+      <div class="bg-surface border-kite rounded-xl overflow-hidden" style="box-shadow: 0 12px 40px rgba(0,0,0,0.06);">
+        <!-- Browser top bar -->
+        <div class="flex items-center gap-3 px-4 py-3 border-kite-b bg-mist">
+          <div class="flex gap-1.5">
+            <div class="w-2.5 h-2.5 rounded-full bg-[var(--toxic-orange)] opacity-80"></div>
+            <div class="w-2.5 h-2.5 rounded-full bg-[var(--rose-gold)] opacity-80"></div>
+            <div class="w-2.5 h-2.5 rounded-full bg-[var(--aqua-mist)] opacity-80"></div>
+          </div>
+          <div class="flex-1 flex justify-center">
+            <div class="bg-surface border-kite rounded-md px-3 py-1 text-[10px] font-mono text-muted flex items-center gap-2">
+              <i data-lucide="lock" class="w-2.5 h-2.5"></i>
+              app.nyaya.ai/scan/technova-nda-2024
+            </div>
+          </div>
+          <div class="flex items-center gap-1.5 text-[9px] font-mono text-muted">
+            <span class="w-1.5 h-1.5 rounded-full bg-[var(--safe-text)] pulse-dot"></span>
+            Live
+          </div>
+        </div>
+
+        <!-- App header -->
+        <div class="flex items-center justify-between px-4 py-2.5 border-kite-b">
+          <div class="flex items-center gap-2">
+            <div class="w-6 h-6 rounded flex items-center justify-center" style="background: var(--black-kite);">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2.5L4 6.2V12C4 16.5 7.4 20.6 12 22C16.6 20.6 20 16.5 20 12V6.2L12 2.5Z" stroke="#FF6037" stroke-width="2" stroke-linejoin="round"/>
+                <path d="M8.5 12L11 14.5L15.5 9.5" stroke="#F5F4ED" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div>
+              <div class="text-[10px] font-semibold text-primary leading-none">TechNova — Vertex NDA</div>
+              <div class="text-[8px] text-muted mt-0.5 font-mono">Ref: TN-VA-NDA-2024-0892</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 text-[9px]">
+            <span class="text-muted font-mono">24 pp.</span>
+            <span class="text-muted font-mono">·</span>
+            <span class="text-muted font-mono">10 clauses</span>
+            <span class="text-muted font-mono">·</span>
+            <span class="text-[var(--toxic-orange)] font-mono font-medium flex items-center gap-1">
+              <i data-lucide="alert-triangle" class="w-2.5 h-2.5"></i>5 risks
+            </span>
+          </div>
+        </div>
+
+        <!-- 3-column layout -->
+        <div class="grid grid-cols-[180px_1fr_200px] h-[360px] overflow-hidden">
+
+          <!-- LEFT: Clause Navigator -->
+          <div class="border-kite-r bg-mist overflow-hidden flex flex-col">
+            <div class="px-3 py-2.5 border-kite-b">
+              <div class="text-[9px] font-semibold text-primary uppercase tracking-wider">Clause Navigator</div>
+              <div class="text-[8px] text-muted mt-0.5">10 clauses · sequenced</div>
+            </div>
+            <div class="flex-1 overflow-hidden">
+              <div class="px-3 py-2 border-kite-b border-l-2 border-l-[var(--aqua-mist)]" style="background: var(--aqua-mist-soft);">
+                <div class="flex items-center justify-between mb-0.5">
+                  <span class="text-[9px] font-mono text-muted">§ 1</span>
+                  <span class="risk-safe text-[7px] font-bold px-1 py-0.5 rounded uppercase">Safe</span>
+                </div>
+                <div class="text-[10px] font-medium text-primary">Definitions</div>
+              </div>
+              <div class="px-3 py-2 border-kite-b border-l-2 border-l-transparent">
+                <div class="flex items-center justify-between mb-0.5">
+                  <span class="text-[9px] font-mono text-muted">§ 2.1</span>
+                  <span class="risk-safe text-[7px] font-bold px-1 py-0.5 rounded uppercase">Safe</span>
+                </div>
+                <div class="text-[10px] font-medium text-primary">Confidentiality</div>
+              </div>
+              <div class="px-3 py-2 border-kite-b border-l-2 border-l-transparent">
+                <div class="flex items-center justify-between mb-0.5">
+                  <span class="text-[9px] font-mono text-[var(--toxic-orange)]">§ 2.3</span>
+                  <span class="risk-high text-[7px] font-bold px-1 py-0.5 rounded uppercase">Void</span>
+                </div>
+                <div class="text-[10px] font-medium text-primary">Non-Compete</div>
+              </div>
+              <div class="px-3 py-2 border-kite-b border-l-2 border-l-transparent">
+                <div class="flex items-center justify-between mb-0.5">
+                  <span class="text-[9px] font-mono text-muted">§ 4.1</span>
+                  <span class="risk-medium text-[7px] font-bold px-1 py-0.5 rounded uppercase">Review</span>
+                </div>
+                <div class="text-[10px] font-medium text-primary">Payment Terms</div>
+              </div>
+              <div class="px-3 py-2 border-kite-b border-l-2 border-l-transparent">
+                <div class="flex items-center justify-between mb-0.5">
+                  <span class="text-[9px] font-mono text-muted">§ 5</span>
+                  <span class="risk-safe text-[7px] font-bold px-1 py-0.5 rounded uppercase">Safe</span>
+                </div>
+                <div class="text-[10px] font-medium text-primary">Intellectual Property</div>
+              </div>
+              <div class="px-3 py-2 border-kite-b border-l-2 border-l-transparent">
+                <div class="flex items-center justify-between mb-0.5">
+                  <span class="text-[9px] font-mono text-[var(--toxic-orange)]">§ 7</span>
+                  <span class="risk-high text-[7px] font-bold px-1 py-0.5 rounded uppercase">Void</span>
+                </div>
+                <div class="text-[10px] font-medium text-primary">Dispute Resolution</div>
+              </div>
+              <div class="px-3 py-2 border-l-2 border-l-transparent">
+                <div class="flex items-center justify-between mb-0.5">
+                  <span class="text-[9px] font-mono text-muted">§ 9</span>
+                  <span class="risk-medium text-[7px] font-bold px-1 py-0.5 rounded uppercase">Review</span>
+                </div>
+                <div class="text-[10px] font-medium text-primary">Liability Cap</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- CENTER: Document -->
+          <div class="overflow-hidden relative bg-surface">
+            <div class="absolute left-0 right-0 h-8 bg-gradient-to-b from-transparent via-[var(--aqua-mist)]/15 to-transparent scan-beam pointer-events-none z-10"></div>
+            <div class="p-5 overflow-hidden">
+              <div class="text-center mb-4">
+                <div class="text-[8px] uppercase tracking-[0.25em] text-muted font-semibold mb-1.5">Mutual Non-Disclosure Agreement</div>
+                <div class="font-display font-semibold text-[14px] text-primary leading-tight">TechNova Solutions Pvt. Ltd. <span class="text-muted font-light">×</span> Vertex Analytics LLP</div>
+                <div class="text-[8px] text-muted mt-1.5 font-mono">Effective 15.11.2024 · 3-year term</div>
+              </div>
+
+              <div class="mock-doc">
+                <p class="mb-2">This Mutual Non-Disclosure Agreement is entered into between <strong>TechNova Solutions Private Limited</strong> (CIN: U72200KA2019PTC128847) and <strong>Vertex Analytics LLP</strong> (LLIN: AAB-1234).</p>
+
+                <div class="mt-3 p-3 rounded-r-md border-l-2 border-l-[var(--garnet)]" style="background: rgba(115, 54, 53, 0.05);">
+                  <div class="flex items-center justify-between mb-1.5">
+                    <div class="text-[10px] font-semibold text-primary"><span class="font-mono text-muted">§ 2.3</span> Non-Compete Restriction</div>
+                    <span class="risk-high text-[7px] font-bold px-1.5 py-0.5 rounded uppercase flex items-center gap-0.5">
+                      <i data-lucide="alert-triangle" class="w-2 h-2"></i>Void · ICA §27
+                    </span>
+                  </div>
+                  <p class="mb-2">The Receiving Party covenants that, for a period of <span class="mock-highlight">five (5) years</span> commencing from the Effective Date, it shall not engage in any business that competes with the Disclosing Party within the <span class="mock-highlight">Republic of India</span>.</p>
+                  <div class="mt-2 p-2 rounded flex items-start gap-1.5" style="background: rgba(115, 54, 53, 0.1); border: 1px solid rgba(115, 54, 53, 0.25);">
+                    <i data-lucide="scale" class="w-2.5 h-2.5 text-[var(--toxic-orange)] mt-0.5 flex-shrink-0"></i>
+                    <div class="text-[9px] leading-relaxed text-secondary">
+                      <strong class="text-[var(--toxic-orange)]">Void under ICA §27.</strong> <em>Niranjan Shankar Golikari v. Century Spinning (1967)</em> — only restrictions during employment term are enforceable.
+                    </div>
+                  </div>
+                </div>
+
+                <div class="mt-3 p-3 rounded-r-md border-l-2 border-l-[var(--rose-gold)]" style="background: rgba(182, 110, 121, 0.05);">
+                  <div class="flex items-center justify-between mb-1.5">
+                    <div class="text-[10px] font-semibold text-primary"><span class="font-mono text-muted">§ 4.1</span> Payment Terms</div>
+                    <span class="risk-medium text-[7px] font-bold px-1.5 py-0.5 rounded uppercase">Review · MSME</span>
+                  </div>
+                  <p>Invoices shall be payable within <span class="mock-highlight" style="background:rgba(182,110,121,0.15);color:var(--rose-gold);border-bottom-color:var(--rose-gold)">ninety (90) days</span> from receipt.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT: Analysis -->
+          <div class="border-kite-l bg-mist overflow-hidden flex flex-col">
+            <div class="px-3 py-2.5 border-kite-b">
+              <div class="text-[9px] font-semibold text-primary uppercase tracking-wider">Compliance Health</div>
+            </div>
+
+            <div class="px-3 py-4 border-kite-b flex flex-col items-center">
+              <div class="relative w-[80px] h-[80px]">
+                <svg viewBox="0 0 120 120" class="w-full h-full -rotate-90">
+                  <circle cx="60" cy="60" r="52" fill="none" stroke="var(--black-kite-15)" stroke-width="9"/>
+                  <circle cx="60" cy="60" r="52" fill="none" stroke="var(--rose-gold)" stroke-width="9"
+                          stroke-dasharray="326.7" stroke-linecap="round" class="dial-progress"/>
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                  <div class="font-display text-[20px] font-bold text-primary leading-none">95<span class="text-[10px] text-muted">%</span></div>
+                  <div class="text-[6.5px] uppercase tracking-wider text-muted mt-0.5 font-semibold">Confidence</div>
+                </div>
+              </div>
+              <div class="mt-2 text-[8px] text-muted font-mono">4 statutes · 2 precedents</div>
+            </div>
+
+            <div class="px-3 py-3 border-kite-b">
+              <div class="text-[8px] font-semibold text-primary uppercase tracking-wider mb-2">Risk Distribution</div>
+              <div class="flex h-1.5 rounded-full overflow-hidden mb-2 border border-[var(--black-kite-15)]">
+                <div class="bg-[var(--garnet)]" style="width:20%"></div>
+                <div class="bg-[var(--rose-gold)]" style="width:30%"></div>
+                <div class="bg-[var(--safe-text)]" style="width:50%"></div>
+              </div>
+              <div class="space-y-1">
+                <div class="flex justify-between text-[8px]">
+                  <span class="text-secondary flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-sm bg-[var(--garnet)]"></span>High</span>
+                  <span class="font-mono text-primary">2 · 20%</span>
+                </div>
+                <div class="flex justify-between text-[8px]">
+                  <span class="text-secondary flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-sm bg-[var(--rose-gold)]"></span>Medium</span>
+                  <span class="font-mono text-primary">3 · 30%</span>
+                </div>
+                <div class="flex justify-between text-[8px]">
+                  <span class="text-secondary flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-sm bg-[var(--safe-text)]"></span>Safe</span>
+                  <span class="font-mono text-primary">5 · 50%</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="px-3 py-3 flex-1">
+              <div class="text-[8px] font-semibold text-primary uppercase tracking-wider mb-2">Statutory References</div>
+              <div class="space-y-1.5">
+                <div class="p-2 rounded border" style="border-color: rgba(115, 54, 53, 0.3); background: rgba(115, 54, 53, 0.08);">
+                  <div class="flex items-center gap-1 mb-0.5">
+                    <i data-lucide="scale" class="w-2 h-2 text-[var(--toxic-orange)]"></i>
+                    <span class="text-[8px] font-semibold text-primary">Indian Contract Act</span>
+                  </div>
+                  <div class="text-[7px] font-mono text-muted mb-0.5">§ 27 — Restraint of Trade</div>
+                </div>
+                <div class="p-2 rounded border" style="border-color: rgba(182, 110, 121, 0.25); background: rgba(182, 110, 121, 0.08);">
+                  <div class="flex items-center gap-1 mb-0.5">
+                    <i data-lucide="scale" class="w-2 h-2 text-[var(--rose-gold)]"></i>
+                    <span class="text-[8px] font-semibold text-primary">MSME Act, 2006</span>
+                  </div>
+                  <div class="text-[7px] font-mono text-muted mb-0.5">§ 15 — Liability to Pay</div>
+                </div>
+                <div class="p-2 rounded border border-[var(--black-kite-15)] bg-surface">
+                  <div class="flex items-center gap-1 mb-0.5">
+                    <i data-lucide="scale" class="w-2 h-2 text-[var(--safe-text)]"></i>
+                    <span class="text-[8px] font-semibold text-primary">IT Act, 2000</span>
+                  </div>
+                  <div class="text-[7px] font-mono text-muted">§ 72A — Data Protection</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== FOOTER ==================== -->
+<footer class="border-kite-t bg-mist">
+  <div class="max-w-7xl mx-auto px-5 sm:px-8 py-14">
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
+      <div class="col-span-2">
+        <div class="flex items-center gap-2.5 mb-4">
+          <div class="w-9 h-9 rounded-md flex items-center justify-center" style="background: var(--black-kite);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2.5L4 6.2V12C4 16.5 7.4 20.6 12 22C16.6 20.6 20 16.5 20 12V6.2L12 2.5Z" stroke="#FF6037" stroke-width="1.5" stroke-linejoin="round"/>
+              <path d="M8.5 12L11 14.5L15.5 9.5" stroke="#F5F4ED" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div>
+            <div class="font-display font-bold text-[16px] tracking-tight text-primary leading-none">Nyaya<span class="text-[var(--toxic-orange)]">.</span>AI</div>
+            <div class="text-[8.5px] uppercase tracking-[0.18em] text-muted mt-1 font-medium">Contract Intelligence</div>
+          </div>
+        </div>
+        <p class="text-[13px] text-secondary leading-relaxed max-w-xs mb-5">
+          AI-assisted contract analysis purpose-built for Indian law. Detect void clauses, statutory violations, and compliance risks before you sign.
+        </p>
+      </div>
+
+      <div>
+        <div class="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted mb-4">Product</div>
+        <ul class="space-y-2.5">
+          <li><a href="#features" class="text-[13px] text-secondary hover:text-primary">Features</a></li>
+          <li><a href="#pricing" class="text-[13px] text-secondary hover:text-primary">Pricing</a></li>
+          <li><a href="#security" class="text-[13px] text-secondary hover:text-primary">Security</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted mb-4">Resources</div>
+        <ul class="space-y-2.5">
+          <li><a href="#" class="text-[13px] text-secondary hover:text-primary">Documentation</a></li>
+          <li><a href="#" class="text-[13px] text-secondary hover:text-primary">Statute Library</a></li>
+          <li><a href="#" class="text-[13px] text-secondary hover:text-primary">Case Law DB</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted mb-4">Legal</div>
+        <ul class="space-y-2.5">
+          <li><a href="#" class="text-[13px] text-secondary hover:text-primary">Privacy Policy</a></li>
+          <li><a href="#" class="text-[13px] text-secondary hover:text-primary">Terms of Service</a></li>
+          <li><a href="#" class="text-[13px] text-secondary hover:text-primary">Disclaimer</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="border-kite-t pt-6 mb-6">
+      <div class="flex items-start gap-2.5 p-4 rounded-md bg-surface border-kite">
+        <i data-lucide="info" class="w-4 h-4 text-[var(--muted-copper)] flex-shrink-0 mt-0.5"></i>
+        <div>
+          <div class="text-[10px] font-semibold uppercase tracking-wider text-muted mb-1.5">Legal Disclaimer</div>
+          <p class="text-[11.5px] text-secondary leading-relaxed">
+            Nyaya AI provides AI-assisted contract analysis for informational purposes only and does not constitute legal advice, opinion, or a solicitor-client relationship. Analysis results should not be relied upon as a substitute for professional legal counsel. Always consult a qualified advocate registered with the Bar Council of India before making legal decisions.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
+      <div class="text-[12px] text-muted">
+        © 2024 Nyaya AI Technologies Pvt. Ltd. · CIN U72900KA2024PTC189432 · All rights reserved.
+      </div>
+      <div class="flex items-center gap-4 text-[11px] text-muted">
+        <span class="font-mono">Made in Bengaluru 🇮🇳</span>
+        <span>·</span>
+        <span class="font-mono">v3.2.1</span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<!-- Fallback timer: Ensures elements are visible even if main script fails -->
+<script>
+  setTimeout(function() {
+    var els = document.querySelectorAll('.reveal:not(.in-view)');
+    for (var i = 0; i < els.length; i++) {
+      els[i].classList.add('in-view');
+    }
+  }, 2500);
+</script>
+
+<script>
+  // === Initialize Lucide icons ===
+  try {
+    lucide.createIcons();
+  } catch (e) {
+    console.error("Lucide failed to load", e);
+  }
+
+  // === Theme toggle ===
+  function toggleTheme() {
+    document.documentElement.classList.toggle('dark');
+    try {
+      var isDark = document.documentElement.classList.contains('dark');
+      localStorage.setItem('nyaya-theme', isDark ? 'dark' : 'light');
+    } catch (e) {}
+    updateThemeIcons();
+  }
+
+  function updateThemeIcons() {
+    var isDark = document.documentElement.classList.contains('dark');
+    var lights = document.querySelectorAll('.light-icon');
+    var darks = document.querySelectorAll('.dark-icon');
+    for (var i = 0; i < lights.length; i++) {
+      lights[i].classList.toggle('hidden', isDark);
+    }
+    for (var j = 0; j < darks.length; j++) {
+      darks[j].classList.toggle('hidden', !isDark);
+    }
+  }
+  updateThemeIcons(); // Run on load
+
+  // === Navbar scroll effect ===
+  var navbar = document.getElementById('navbar');
+  window.addEventListener('scroll', function() {
+    if (window.scrollY > 16) {
+      navbar.classList.add('scrolled');
+    } else {
+      navbar.classList.remove('scrolled');
+    }
+  });
+
+  // === Reveal on scroll ===
+  var revealElements = document.querySelectorAll('.reveal');
+  if ('IntersectionObserver' in window) {
+    var observer = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('in-view');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -60px 0px' });
+    
+    revealElements.forEach(function(el) { 
+      observer.observe(el); 
+    });
+  } else {
+    // Fallback for old browsers
+    revealElements.forEach(function(el) { el.classList.add('in-view'); });
+  }
+</script>
+</body>
+</html>

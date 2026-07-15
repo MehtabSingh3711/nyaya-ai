@@ -97,9 +97,18 @@ def mock_pipeline():
         embedder.embed_query_hybrid.return_value = hybrid_result
         mock_embed_cls.return_value = embedder
 
-        # Setup Reranker — identity rerank (pass through candidates as-is)
+        # Setup Reranker — identity rerank (pass through candidates as-is, ensuring rerank_score is set)
+        def mock_rerank_side_effect(query, candidates, top_k, **kw):
+            res = []
+            for c in candidates[:top_k]:
+                enriched = dict(c)
+                if "rerank_score" not in enriched:
+                    enriched["rerank_score"] = enriched.get("score", 0.5)
+                res.append(enriched)
+            return res
+
         reranker = MagicMock()
-        reranker.rerank.side_effect = lambda query, candidates, top_k, **kw: candidates[:top_k]
+        reranker.rerank.side_effect = mock_rerank_side_effect
         mock_reranker_cls.return_value = reranker
         
         yield mock_extract, mock_qdrant, mock_cascade

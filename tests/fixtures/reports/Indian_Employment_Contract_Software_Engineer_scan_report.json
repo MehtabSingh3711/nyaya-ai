@@ -1,0 +1,22 @@
+{
+  "contract_name": "Indian_Employment_Contract_Software_Engineer.pdf",
+  "total_clauses_scanned": 10,
+  "findings": [
+    {
+      "clause_number": "7",
+      "clause_text": "7. Restrictive Covenants\nThe Employee acknowledges access to valuable confidential information and agrees that, for a\nperiod of twenty-four (24) months following termination of employment for any reason, the\nEmployee shall not, directly or indirectly, accept employment with, provide services to, consult for,\nestablish, finance, or otherwise participate in any competing business operating anywhere within\nIndia where such activities are similar to those performed for the Employer.",
+      "page": 1,
+      "clause_type": "non_compete",
+      "risk_level": "high",
+      "conflicting_act": "Indian Contract Act, 1872",
+      "conflicting_section": "27",
+      "conflicting_law_quote": "Every agreement by which anyone is restrained from exercising a lawful profession, trade or business of any kind, is to that extent void.",
+      "explanation": "The restrictive covenant in the clause is in direct conflict with Section 27 of the Indian Contract Act, 1872, which states that every agreement by which anyone is restrained from exercising a lawful profession, trade or business of any kind, is to that extent void. The clause attempts to restrict the employee from engaging in similar activities for a period of 24 months after termination, which is a restraint of trade and thus void under the Indian Contract Act, 1872.",
+      "recommended_action": "Remove or modify the restrictive covenant to comply with Indian law, considering exceptions such as those related to the sale of goodwill, and ensure it does not restrain the employee from exercising a lawful profession or trade.",
+      "confidence": 0.95
+    }
+  ],
+  "scan_confidence": 0.9800000000000001,
+  "status": "risks_found",
+  "message": "Scan complete. Identified 1 statutory risk findings."
+}

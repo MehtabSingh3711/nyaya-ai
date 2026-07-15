@@ -65,8 +65,23 @@ def _format_context(context_chunks: list[dict]) -> str:
         section = chunk.get("section_number", "?")
         text = chunk.get("text", "")
         score = chunk.get("score", 0.0)
+
+        # Amendment status annotation
+        amendment_status = chunk.get("amendment_status", "original")
+        status_tag = ""
+        if amendment_status == "omitted":
+            amended_by = chunk.get("amended_by", "unknown amendment")
+            status_tag = f" [⚠ OMITTED by {amended_by}]"
+        elif amendment_status == "amended":
+            amended_by = chunk.get("amended_by", "unknown amendment")
+            status_tag = f" [AMENDED by {amended_by}]"
+        elif amendment_status == "repealed":
+            amended_by = chunk.get("amended_by", "unknown")
+            status_tag = f" [⚠ REPEALED — {amended_by}]"
+
         parts.append(
-            f"[Section {i}] {act}, Section {section} (relevance: {score:.2f})\n{text}"
+            f"[Section {i}] {act}, Section {section} "
+            f"(relevance: {score:.2f}){status_tag}\n{text}"
         )
     return "\n\n".join(parts)
 
