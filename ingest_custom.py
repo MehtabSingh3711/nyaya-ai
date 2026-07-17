@@ -42,6 +42,9 @@ def main():
         console.print("[red bold]Error:[/] JSON file must contain a list of section objects.")
         sys.exit(1)
 
+    from datetime import datetime
+    current_date = datetime.now().strftime("%Y-%m-%d")
+
     chunks = []
     for idx, item in enumerate(raw_data, 1):
         if not all(k in item for k in ("act_name", "section_number", "text")):
@@ -51,9 +54,14 @@ def main():
         chunk = CorpusChunk(
             act_name=item["act_name"].strip(),
             section_number=str(item["section_number"]).strip(),
+            section_title=item.get("section_title", "").strip() or None,
+            chapter=item.get("chapter", "").strip() or None,
             text=item["text"].strip(),
             source=json_path.name,
-            amendment_status="original"
+            version="2023-reforms",
+            amendment_status="original",
+            last_verified_source="Gazette of India",
+            last_verified_date=current_date
         )
         chunks.append(chunk)
 

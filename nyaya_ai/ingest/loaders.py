@@ -241,3 +241,63 @@ def _extract_act_name(raw_text: str) -> str:
             return line[:100]  # cap at 100 chars
 
     return "Unknown Act"
+
+
+def load_gsms_b(registry: DedupRegistry) -> list[CorpusChunk]:
+    """Load GSMS-B/indian-legal-sections-bns-bnss-bsa-2023.
+
+    Contains 1,059 verified sections from the new 2023 criminal justice reform acts:
+    Bharatiya Nyaya Sanhita (BNS), Bharatiya Nagarik Suraksha Sanhita (BNSS),
+    and Bharatiya Sakshya Adhiniyam (BSA).
+    """
+    from datasets import load_dataset
+
+    dataset_id = "GSMS-B/indian-legal-sections-bns-bnss-bsa-2023"
+    console.print(f"[bold blue]Loading {dataset_id}...[/]")
+
+    try:
+        ds = load_dataset(dataset_id, split="train")
+    except Exception as e:
+        console.print(f"[red]Failed to load {dataset_id}: {e}[/]")
+        return []
+
+    console.print(f"  Rows: {len(ds)}")
+
+    chunks: list[CorpusChunk] = []
+    skipped_dup = 0
+    skipped_empty = 0
+
+    for row in ds:
+        # Actual keys in GSMS-B: act, section_number, text, section_title, chapter
+        act_title = row.get("act", "") or ""
+        section = row.get("section_number", "") or ""
+        law_text = row.get("text", "") or ""
+        section_title = row.get("section_title", "") or None
+        chapter = row.get("chapter", "") or None
+
+        if not act_title.strip() or not law_text.strip():
+            skipped_empty += 1
+            continue
+
+        chunk = CorpusChunk(
+            act_name=act_title.strip(),
+            section_number=str(section).strip(),
+            section_title=section_title.strip() if section_title else None,
+            chapter=chapter.strip() if chapter else None,
+            text=law_text.strip(),
+            source=dataset_id,
+            version="2023-reforms",
+        )
+
+        if not registry.register_and_check(chunk):
+            skipped_dup += 1
+            continue
+
+        chunks.append(chunk)
+
+    console.print(
+        f"  [green]Loaded: {len(chunks)} sections[/] | "
+        f"Empty: {skipped_empty} | Duplicates: {skipped_dup}"
+    )
+    return chunks
+

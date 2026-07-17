@@ -48,7 +48,7 @@ from rich.table import Table
 
 from nyaya_ai.config import COLLECTION_NAME, EMBEDDING_DIM
 from nyaya_ai.ingest.dedup import DedupRegistry
-from nyaya_ai.ingest.loaders import load_geekyrakshit, load_mratanusarkar
+from nyaya_ai.ingest.loaders import load_geekyrakshit, load_mratanusarkar, load_gsms_b
 from nyaya_ai.retrieval.embedder import Embedder
 from nyaya_ai.schemas import CorpusChunk
 from nyaya_ai.store.qdrant import (
@@ -70,7 +70,7 @@ UPSERT_BATCH_SIZE = 100
 # Mode: Full ingestion (default)
 # ===================================================================
 
-def run_full_ingestion() -> None:
+def run_full_ingestion(reforms_only: bool = False) -> None:
     """Run the full ingestion pipeline with hybrid encoding."""
     start_time = time.time()
 
@@ -102,14 +102,21 @@ def run_full_ingestion() -> None:
     console.print("\n[bold]Step 2:[/] Loading datasets...\n")
     registry = DedupRegistry()
 
-    # Primary dataset — pre-sectioned, registers in dedup
-    primary_chunks = load_mratanusarkar(registry)
+    if reforms_only:
+        console.print("[yellow]Skipping primary and secondary corpuses. Ingesting BNS, BNSS, and BSA (2023 Reforms) only.[/]")
+        all_chunks = load_gsms_b(registry)
+    else:
+        # Primary dataset — pre-sectioned, registers in dedup
+        primary_chunks = load_mratanusarkar(registry)
 
-    # Secondary dataset — raw text, chunked, dedup-filtered
-    secondary_chunks = load_geekyrakshit(registry)
+        # Secondary dataset — raw text, chunked, dedup-filtered
+        secondary_chunks = load_geekyrakshit(registry)
+        
+        # 2023 Reforms dataset — new criminal reform codes (BNS, BNSS, BSA)
+        reforms_chunks = load_gsms_b(registry)
 
-    # Combine
-    all_chunks = primary_chunks + secondary_chunks
+        # Combine
+        all_chunks = primary_chunks + secondary_chunks + reforms_chunks
 
     if not all_chunks:
         console.print("\n[red bold]No chunks loaded. Nothing to ingest.[/]")
@@ -607,6 +614,11 @@ Examples:
         action="store_true",
         help="One-time: set amendment_status='original' on all existing points",
     )
+    parser.add_argument(
+        "--reforms-only",
+        action="store_true",
+        help="Only ingest the 2023 Criminal Reform Acts (BNS, BNSS, BSA) from GSMS-B",
+    )
 
     args = parser.parse_args()
 
@@ -621,7 +633,7 @@ Examples:
     elif args.amend:
         run_amend(args.amend)
     else:
-        run_full_ingestion()
+        run_full_ingestion(reforms_only=args.reforms_only)
 
 
 if __name__ == "__main__":

@@ -6,10 +6,9 @@ from dotenv import load_dotenv
 # ---------------------------------------------------------------------------
 # Global Progress Bar and Logger Silencing
 # ---------------------------------------------------------------------------
-# Disable Hugging Face download progress bars
-os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
 # Silence HF/tokenizers parallelism warnings
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 
 # Globally disable tqdm progress bars (used by FastEmbed and sentence-transformers)
 try:
@@ -24,6 +23,12 @@ except ImportError:
     pass
 
 load_dotenv()
+
+# Set HF_TOKEN if available in environment
+HF_TOKEN = os.getenv("HF_TOKEN")
+if HF_TOKEN:
+    os.environ["HF_TOKEN"] = HF_TOKEN
+
 
 # ---------------------------------------------------------------------------
 # Qdrant — local file-based storage (no Docker needed)
