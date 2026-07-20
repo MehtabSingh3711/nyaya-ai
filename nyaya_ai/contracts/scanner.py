@@ -87,6 +87,8 @@ def scan_contract(
     relevance_threshold: float = CONTRACT_RELEVANCE_THRESHOLD,
     top_k: int = CONTRACT_RISK_TOP_K,
     verbose: bool = False,
+    embedder: Optional[Embedder] = None,
+    reranker: Optional[Reranker] = None,
 ) -> ContractScanResult:
     """Extract, chunk, retrieve, gate, and assess contract risks.
 
@@ -96,8 +98,10 @@ def scan_contract(
     Args:
         file_path: Path to the contract file (PDF or DOCX).
         relevance_threshold: Permissive cosine similarity gate.
-        top_k: Number of retrieved statute sections from nyaya_corpus.
+        top_k: Number of retrieved statutory sections from nyaya_corpus.
         verbose: Print detailed step-by-step evaluation logs to console.
+        embedder: Optional preloaded Embedder singleton.
+        reranker: Optional preloaded Reranker singleton.
 
     Returns:
         ContractScanResult summary and detailed risk findings.
@@ -131,8 +135,11 @@ def scan_contract(
             message="Contract contains no readable clauses to scan.",
         )
 
-    embedder = Embedder()
-    reranker = Reranker()
+    from typing import Optional
+    if embedder is None:
+        embedder = Embedder()
+    if reranker is None:
+        reranker = Reranker()
 
     # 3. Index clauses into Qdrant 'nyaya_contracts' collection (ignoring failures)
     try:

@@ -1,9 +1,9 @@
 # Initial Design Doc — Nyaya AI: Contract Intelligence
 
 **Author:** Mehtab Singh
-**Date:** 24 June 2026
-**Status:** Draft — for mentor review
-**Due:** 24 June 2026
+**Date:** 20 July 2026
+**Status:** Approved / Active Development
+**Timeline:** Extended to 25 July 2026
 
 ---
 
@@ -11,26 +11,19 @@
 
 > **Nyaya AI gives anyone in India the same contract review a ₹50,000 lawyer would give them — in 30 seconds, for free.**
 
-A contract review by a qualified Indian lawyer costs ₹5,000–₹50,000 and takes 2–7 days. For most working Indians — gig workers, MSME owners, freelancers, first-time employees — that review never happens. They sign. The consequence surfaces months later when the non-compete lands, the payment window closes, or the legal notice arrives.
+Commercial contracts are drafted in opaque legalese, burying crucial risk clauses like non-competes, payment terms, or liability caps. Freelancers, startup founders, and MSME owners cannot afford high legal review costs. Consequently, they sign blind, exposing themselves to severe compliance issues.
 
-Nyaya AI closes that gap with a two-mode platform:
-
-- **Mode 1 — Automatic Scan:** Upload a contract. Get a structured risk report in ~30 seconds — flagged clauses, legal basis, negotiation stance, cited to the exact page and paragraph.
-- **Mode 2 — Legal Intelligence Chat:** Ask plain-language questions about a contract or about Indian law generally. Get grounded, cited answers from a structured Indian legal corpus. No answer without a source.
+Nyaya AI solves this by introducing a dual-mode legal workstation:
+* **Mode 1 — Automatic Compliance Scan**: Automatically extracts clauses, checks statutory alignment, and flags compliance risks (e.g. MSME payment violations or void restraint-of-trade clauses).
+* **Mode 2 — Legal Intelligence Chat**: A statutory and precedent RAG chat that answers legal queries with verbatim citations to official Gazette acts and Supreme Court judgments.
 
 ---
 
 ## What Makes This Different
 
-Most "AI for legal" products are wrappers around a generic LLM. They hallucinate confidently and cannot tell you *where in the law* a claim comes from.
-
-Nyaya AI is built differently in three ways:
-
-1. **Cite-or-refuse.** If retrieved evidence is below confidence threshold, the system outputs "I don't know" — not a fabricated legal claim. In a legal product, one wrong citation destroys trust permanently. The cite-or-refuse logic is architectural, not a patch.
-
-2. **Shared legal corpus as foundation.** Both modes retrieve from the same versioned Indian legal corpus (statutes, Acts). Mode 1's scan engines and Mode 2's conversational agent are built on top of one retrieval infrastructure — not duplicated. New legal domains (criminal law, regulatory compliance) plug in by expanding the corpus, not rebuilding the pipeline.
-
-3. **Indian law specificity.** ICA §27 (non-competes void since 1872), MSME Development Act 2006 (45-day payment mandate), IPC 1860 — these are not generic legal concepts. The system knows Indian law, Indian contract structure, and Indian legal language.
+1. **Cite-or-Refuse**: Built-in guardrails refuse queries with low confidence rather than generating hallucinations. In legal AI, citation accuracy is a trust-critical element.
+2. **Grounded Multi-Source Corpus**: Integrates both official Indian Central Acts and High Court / Supreme Court precedents (`nyaya_precedents`) in Qdrant Cloud.
+3. **Cloud Cascade Architecture**: Implements a cascading model workflow (Groq Llama 3.1 8B $\rightarrow$ Gemini 2.5 Flash Lite $\rightarrow$ OpenRouter Qwen 3) that delivers near-instant latency (2s) while keeping operational costs at exactly ₹0.00.
 
 ---
 
@@ -40,71 +33,50 @@ Nyaya AI is built differently in three ways:
 User input (PDF / DOCX / chat question)
         │
         ▼
-  Document ingestion                     Legal corpus
-  PyMuPDF + PaddleOCR                   (Qdrant collection 1)
-  + Unstructured.io                      ICA 1872, MSME Act,
-        │                                IT Act, IPC, CPC
+   Document Ingestion                      Legal Corpus
+  PyMuPDF + Parser                        (Qdrant Cloud)
+        │                            Statutes + Case Precedents
         ▼                                      │
-  Structural chunking                          │
-  (clause-boundary aware)                      │
+   Structural Chunking                         │
+ (Clause patterns, symbols)                    │
         │                                      │
-        └──────────────┬────────────────────────┘
+        └──────────────┬───────────────────────┘
                        ▼
-              Hybrid retrieval
-              BM25 + BGE-M3 dense
-              + cross-encoder rerank
+               Hybrid Retrieval
+          (Dense BGE-M3 + Sparse)
                        │
                        ▼
-              LLM cost cascade
-              Phi-3 Mini → Gemma-2-9B → GPT-4o
-              (escalate on low confidence)
+                 Jina Reranker
+               (Relevance Gate)
+                       │
+                       ▼
+               Cloud LLM Cascade
+             Groq ──► Gemini ──► OpenRouter
                        │
                   ┌────┴────┐
                   ▼         ▼
-            Mode 1        Mode 2
-         Risk report    Cited answer
-        + citations   + session memory
+                Mode 1    Mode 2
+             Compliance   RAG Chat
+               Report    + Citations
 ```
 
-**Stack:** FastAPI · Qdrant · BGE-M3 · Pydantic v2 · Langfuse · RAGAS
+**Stack**: Next.js · FastAPI · Qdrant Cloud · BGE-M3 · Jina Reranker · SQLite · SQLAlchemy · ReportLab · PyTest
 
 ---
 
-## The #1 Risk
+## Technical Risks & Mitigation
 
-**Hallucinated legal citations.**
-
-An LLM stating that a clause "violates ICA §27" when the retrieved context does not actually support that claim is not a minor accuracy issue — it is a trust-destruction event. A user who acts on a fabricated legal claim and is wrong has been harmed by the product.
-
-**Mitigation (built in from Week 1):**
-- Every claim requires a retrieved source passage above a confidence threshold
-- Below threshold → system outputs "I don't know" with an explanation of what it could and could not find
-- RAGAS citation-precision metric in the eval harness measures this explicitly
-- Target: hallucination rate < 5% on the 100-question test set
+* **Risk 1: Hallucinated Legal Citations**
+  * *Mitigation*: Strict Pydantic schema validation (`CitedAnswer` and `RiskFinding`) requiring exact matches with retrieved chunks. Low confidence automatically triggers a refusal ("Insufficient Information").
+* **Risk 2: Inference Latency**
+  * *Mitigation*: Switched from local CPU Ollama inference (which took ~5 minutes) to cloud APIs (Groq and Gemini free tiers) reducing inference times to under 3 seconds. Preloaded singletons on FastAPI startup to avoid model reload delays.
 
 ---
 
-## Build Order and Week 1 Milestone
+## Timeline & Build Order
 
-**Why Mode 2 first:** The legal corpus — chunked, embedded, and indexed in Qdrant — is the foundation that Mode 1's scan engines sit on top of. Building the retrieval infrastructure once, correctly, before adding the scan engines avoids duplication and forces the citation logic to be right from the start.
-
-**By end of Week 1 (27 June), demoable:**
-
-> Upload the Indian legal corpus (ICA 1872, MSME Act 2006, IT Act 2000, IPC 1860, Code of Civil Procedure). Ask: *"Is a non-compete clause enforceable in India?"* System returns a cited answer: ICA §27, plain-language explanation, confidence score. "I don't know" path tested and working.
-
-**Week 2:** Mode 1 scan engines (ICA §27 detector, MSME payment term detector) built on top of the same retrieval index.
-**Week 3:** Semantic diff engine, agentic batch sweep, eval harness.
-**Week 4:** Frontend, observability, eval report.
-**Week 5:** Hardening, demo polish, documentation.
-
----
-
-## Open Questions
-
-1. **Corpus licensing:** ICA 1872 and older statutes are public domain. MSME Act 2006, IT Act 2000, IPC 1860 — need to confirm the source (India Code / bare acts) is permissible to index.
-2. **Scanned contract quality:** PaddleOCR accuracy on low-quality scans may hurt citation precision. Need to test on a sample of real scanned contracts in Week 1.
-3. **Confidence threshold calibration:** The cite-or-refuse threshold needs to be tuned against the eval set — starting value TBD after first eval run.
-
----
-
-*This design doc was produced in Session 1 of the Nyaya AI internship on 24 June 2026.*
+* **Week 1 (Foundation)**: Statutory ingestion of 33,000+ sections (Central Acts), dense retrieval index setup, and RAG CLI. *(Completed)*
+* **Week 2 (Core Build)**: Contract chunking rules, ICA §27 & MSME payment scanners, and Cloud LLM Cascade integration. *(Completed)*
+* **Week 3 (Hardening & Backend)**: Expanded corpus with DPDP Act, Mediation Act, Telecom Act, and Jan Vishwas Act. Set up the FastAPI backend and SQLite database to track sessions and scan histories, and implemented ReportLab PDF compliance report exports. *(Completed)*
+* **Week 4 (Poland & Polish)**: Ingestion of custom `nyaya_precedents` dataset (Supreme Court landmark rulings) into Qdrant Cloud. Build Next.js frontend pages and integrate them with backend API routes.
+* **Week 5 (Final Delivery - Due July 25)**: End-to-end testing, Loom demo recording, and final submission.

@@ -103,25 +103,38 @@ python query.py "What are the rules for transferring data outside India under DP
 
 ---
 
-## ⏭️ Next Milestones (For Claude Backend & Frontend Dev)
+## ⚡ FastAPI Backend API Specifications
 
-### 1. FastAPI Backend (Mode 1 & Mode 2 API)
-We need to transition from the CLI to an asynchronous REST API containing the following endpoints:
-* **`POST /api/v1/chat`**: Mode 2 RAG Chat endpoint. Accepts a user query and returns a structured `CitedAnswer` JSON response.
-* **`POST /api/v1/contracts/scan`**: Mode 1 Contract upload and scan.
-  1. Accepts a PDF contract upload.
-  2. Parses it via PyMuPDF.
-  3. Chunks it into clauses via `nyaya_ai/contracts/chunker.py`.
-  4. Runs a background task (using **Celery + Redis**) to scan each clause against Qdrant Cloud.
-  5. Evaluates compliance (e.g. checks against ICA §27, MSME 45-day rule, and general post-2021 acts).
-  6. Stores scan results in a relational database (PostgreSQL/SQLite) and returns a unique `scan_id`.
-* **`GET /api/v1/contracts/scan/{scan_id}`**: Retrieves the completed scan report containing flagged clauses, cited laws, risk levels, and legal reasoning.
+The FastAPI backend is fully implemented and connects to our core retrieval and scanning models. 
 
-### 2. Next.js Frontend
-A premium dashboard styled with an authority dark theme using **shadcn/ui** and **TailwindCSS**:
-* **RAG Chat Panel**: Sleek, message-based chat interface displaying citations in side panels upon clicking highlighted quotes.
-* **Contract Scanner Dashboard**: Drag-and-drop zone for contract PDFs, showing a real-time progress bar of analyzed clauses.
-* **Compliance Report View**: Interactive list of flagged clauses categorized by risk level (High/Medium/Low) showing side-by-side:
-  * The offending contract clause.
-  * The violated statutory section.
-  * Recommended negotiation stance and legal reasoning.
+### 1. How to run the API locally
+```bash
+uvicorn nyaya_ai.api.main:app --reload
+```
+The server will start at `http://127.0.0.1:8000` and automatically create the SQLite database file `nyaya_history.db` in your root directory.
+
+### 2. Available API Endpoints
+
+#### RAG Chat (Mode 2) & History
+* **`POST /api/v1/chat`**: Performs hybrid search, rerank, and cascade reasoning on the user message. Returns `{ "session_id": str, "answer": CitedAnswer }`.
+* **`GET /api/v1/chat/sessions`**: Returns a list of all historical chat session metadata for the "Resume Chat" sidebar.
+* **`GET /api/v1/chat/sessions/{session_id}`**: Retrieves the full chronological message log of a chat session, including user inputs, assistant responses, and parsed citations.
+* **`DELETE /api/v1/chat/sessions/{session_id}`**: Deletes a chat session history from the database.
+
+#### Contract Scanning (Mode 1) & Dashboard
+* **`POST /api/v1/contracts/scan`**: Accepts a multipart file upload (PDF/DOCX, 10MB limit), inserts a processing scan record into SQLite, and triggers the `BackgroundTasks` runner. Returns `{ "scan_id": str, "status": "processing" }` immediately.
+* **`GET /api/v1/contracts/scan/{scan_id}`**: Retrieves the current status or final `ContractScanResult` JSON payload if complete.
+* **`GET /api/v1/contracts/scan/{scan_id}/export`**: Streams a customized, premium PDF compliance report built with ReportLab.
+* **`GET /api/v1/contracts/scans`**: Lists past scans for the dashboard's ingestion history table.
+* **`GET /api/v1/dashboard/stats`**: Returns aggregate metrics: total contracts scanned, total risks identified, and total API cost (always `₹0.00`).
+
+---
+
+## ⏭️ Next Milestones (Frontend Development)
+
+### Next.js Frontend Setup
+Build the premium dashboard interface using Next.js, **shadcn/ui**, and **TailwindCSS** to connect to this API.
+* **Authentication**: Integrate next-auth, Clerk, or handle mock logins client-side (as selected under Option A).
+* **RAG Chat Panel**: Message-based interface displaying the session history sidebar using `/api/v1/chat/sessions` and showing citations in side drawers.
+* **Contract Scanner Dashboard**: Drag-and-drop file upload zone feeding into `/api/v1/contracts/scan` and displaying real-time compliance meters.
+
