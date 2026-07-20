@@ -11,8 +11,8 @@ from nyaya_ai.schemas import CitedAnswer, Citation, ContractScanResult, RiskFind
 
 # We must patch the Embedder and Reranker during import or startup
 # to prevent it from trying to download BGE-M3 (2.3GB) during test initialization.
-with patch("nyaya_ai.api.main.Embedder") as mock_embedder_class, \
-     patch("nyaya_ai.api.main.Reranker") as mock_reranker_class:
+with patch("nyaya_ai.retrieval.embedder.Embedder") as mock_embedder_class, \
+     patch("nyaya_ai.retrieval.reranker.Reranker") as mock_reranker_class:
     
     # Initialize mock instances
     mock_embedder = MagicMock()
@@ -23,10 +23,14 @@ with patch("nyaya_ai.api.main.Embedder") as mock_embedder_class, \
 
     from nyaya_ai.api.main import app
 
-# Setup test database engine (in-memory SQLite)
+from sqlalchemy.pool import StaticPool
+
+# Setup test database engine (in-memory SQLite shared across connections)
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+    SQLALCHEMY_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

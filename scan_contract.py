@@ -52,6 +52,13 @@ def print_cli_report(result: ContractScanResult) -> None:
     if result.status == "risks_found":
         console.print(f"[bold red]Identified Risks ({len(result.findings)}):[/]\n")
         for idx, finding in enumerate(result.findings, 1):
+            # Precedent citations
+            precedents_str = ""
+            if hasattr(finding, "relevant_precedents") and finding.relevant_precedents:
+                precedents_str = "\n\n[bold]Supporting Judicial Precedents:[/]"
+                for prec in finding.relevant_precedents:
+                    precedents_str += f"\n  • [bold cyan]{prec.case_name}[/] [dim]({prec.citation})[/]\n    [italic]{prec.core_holding.strip()}[/]"
+
             finding_text = (
                 f"[bold]Clause Reference:[/] Clause {finding.clause_number} (Page {finding.page})\n"
                 f"[bold]Clause Text:[/]\n[italic]\"{finding.clause_text.strip()}\"[/]\n\n"
@@ -59,7 +66,9 @@ def print_cli_report(result: ContractScanResult) -> None:
                 f"[bold]Statutory Quote:[/]\n[yellow]\"{finding.conflicting_law_quote.strip()}\"[/]\n\n"
                 f"[bold]Legal Explanation:[/]\n{finding.explanation}\n\n"
                 f"[bold green]Recommended Action:[/] [green]{finding.recommended_action}[/]"
+                f"{precedents_str}"
             )
+
             
             # Panel border color based on risk level
             border_color = "red" if finding.risk_level == "high" else "yellow"

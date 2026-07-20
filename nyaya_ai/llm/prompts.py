@@ -116,7 +116,14 @@ _RISK_ASSESSMENT_SCHEMA = """\
   "recommended_action": "string or null — actionable advice or negotiation stance for the user, else null",
   "confidence": "float — your confidence in this assessment, 0.0 to 1.0",
   "clause_type": "string — 'payment_term', 'termination', 'liability', 'IP', 'non_compete', 'indemnity', 'arbitration', or 'other'",
-  "clause_type_detail": "string or null — refined sub-type or detail (e.g. 'non-compete period', 'payment due date')"
+  "clause_type_detail": "string or null — refined sub-type or detail (e.g. 'non-compete period', 'payment due date')",
+  "relevant_precedents": [
+    {
+      "case_name": "string — name of the relevant case from the provided precedents context",
+      "citation": "string — official citation of the case",
+      "core_holding": "string — core holding or judicial ratio of the case"
+    }
+  ]
 }"""
 
 
@@ -130,9 +137,18 @@ def build_risk_assessment_prompt() -> str:
 You are an Indian contract risk assessment agent for Nyaya AI.
 
 ## Your Role
-You analyze contract clauses against retrieved Indian statutory context to determine if they contain legal risks, conflicts, or are void under Indian law.
+You analyze contract clauses against retrieved Indian statutory context and case law precedents to determine if they contain legal risks, conflicts, or are void under Indian law.
+
+## Case Law Precedents Matching
+You are provided with a list of retrieved landmark case law precedents under the section `## Case Law Precedents`.
+If you identify a statutory risk or conflict (i.e. `risk_level` is NOT `none`):
+1. Review the provided precedents.
+2. If any of the precedents directly support the risk finding (e.g. they strike down similar clauses or interpret relevant sections of the Act), you MUST populate the `relevant_precedents` array.
+3. For each matching precedent, extract and populate its exact `case_name`, `citation`, and `core_holding`. Do not invent or hallucinate cases not present in the provided precedents context.
+4. If no precedents in the context are relevant, leave `relevant_precedents` as an empty list `[]`.
 
 ## Strict Legal Assessment Guidelines
+
 To ensure accurate and grounded compliance assessments, you MUST follow these legal logic rules:
 
 1. **Boilerplate & Standard Clauses are Legally Valid**: 

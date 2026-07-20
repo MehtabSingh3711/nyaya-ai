@@ -38,6 +38,7 @@ QDRANT_PATH = "./qdrant_data"    # persistent local storage
 QDRANT_URL = os.getenv("QDRANT_URL", None)  # e.g. "http://localhost:6333" for Docker mode
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY", None)
 COLLECTION_NAME = "nyaya_corpus"
+PRECEDENTS_COLLECTION_NAME = "nyaya_precedents"
 
 # ---------------------------------------------------------------------------
 # Embedding — BGE-M3 (ADR-002)
@@ -66,7 +67,7 @@ RERANKER_MODEL = "jinaai/jina-reranker-v1-turbo-en"
 # Tier 1 — Groq
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
-GROQ_MODEL = "qwen/qwen3-32b"
+GROQ_MODEL = "qwen/qwen3.6-27b"
 
 # Tier 2 — Gemini (via OpenAI-compatible endpoint)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")

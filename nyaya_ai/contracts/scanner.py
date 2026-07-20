@@ -198,6 +198,21 @@ def scan_contract(
             top_k=top_k,
         )
 
+        # Retrieve matching case law precedents from nyaya_precedents (dense + sparse hybrid)
+        precedent_chunks = []
+        try:
+            from nyaya_ai.config import PRECEDENTS_COLLECTION_NAME
+            precedent_candidates = qdrant.search(
+                query_vector=query_hybrid.dense,
+                sparse_vector=query_hybrid.sparse,
+                top_k=3,  # Retrieve top-3 most relevant precedents
+                collection_name=PRECEDENTS_COLLECTION_NAME,
+            )
+            precedent_chunks = precedent_candidates
+        except Exception as e:
+            if verbose:
+                log_verbose(f"[yellow]Failed to retrieve precedents from Qdrant: {e}[/]")
+
         # Relevance pre-filter gate (using reranker score)
         max_score = max([c["rerank_score"] for c in retrieved_chunks]) if retrieved_chunks else 0.0
 
@@ -250,6 +265,7 @@ def scan_contract(
             clause_text=clause.clause_text,
             context_chunks=retrieved_chunks,
             best_guess_type=best_guess_type,
+            precedent_chunks=precedent_chunks,
         )
 
         if verbose:
@@ -287,6 +303,7 @@ def scan_contract(
                     explanation=assessment.explanation,
                     recommended_action=assessment.recommended_action,
                     confidence=assessment.confidence,
+                    relevant_precedents=assessment.relevant_precedents or [],
                 )
                 findings.append(finding)
                 confidence_sum += assessment.confidence

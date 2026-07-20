@@ -86,6 +86,39 @@ def _format_context(context_chunks: list[dict]) -> str:
     return "\n\n".join(parts)
 
 
+def _format_precedents(precedent_chunks: list[dict]) -> str:
+    """Format retrieved case law precedents into a context block for the LLM.
+
+    Args:
+        precedent_chunks: List of payload dicts from Qdrant search
+                          in the precedents collection.
+
+    Returns:
+        Formatted string with case details.
+    """
+    if not precedent_chunks:
+        return "(No matching case law precedents available)"
+
+    parts = []
+    for i, chunk in enumerate(precedent_chunks, 1):
+        name = chunk.get("case_name", "Unknown Case")
+        citation = chunk.get("citation", "Unknown Citation")
+        category = chunk.get("category", "")
+        issue = chunk.get("key_issue", "")
+        holding = chunk.get("core_holding", "")
+
+        parts.append(
+            f"[Precedent {i}]\n"
+            f"Case Name: {name}\n"
+            f"Citation: {citation}\n"
+            f"Category: {category}\n"
+            f"Key Legal Issue: {issue}\n"
+            f"Core Judicial Holding: {holding}"
+        )
+    return "\n\n".join(parts)
+
+
+
 def _build_user_message(question: str, context_str: str) -> str:
     """Build the user message for the LLM."""
     return (
@@ -453,6 +486,7 @@ def _make_risk_fallback(clause_type: str, reason: str) -> RiskAssessment:
         explanation=f"Cascade failed to run risk assessment: {reason}",
         confidence=0.0,
         clause_type=clause_type,
+        relevant_precedents=[],
     )
 
 
@@ -460,6 +494,7 @@ def cascade_risk_assessment(
     clause_text: str,
     context_chunks: list[dict],
     best_guess_type: str,
+    precedent_chunks: list[dict] | None = None,
 ) -> RiskAssessment:
     """Run the 3-tier LLM cascade to assess contract clause risks.
 
@@ -469,17 +504,20 @@ def cascade_risk_assessment(
         clause_text: Verbatim contract clause.
         context_chunks: List of payload dicts from Qdrant search.
         best_guess_type: The local best-guess clause type.
+        precedent_chunks: Optional list of relevant case law precedents.
 
     Returns:
         A validated RiskAssessment model.
     """
     system_prompt = build_risk_assessment_prompt()
     context_str = _format_context(context_chunks)
+    precedents_str = _format_precedents(precedent_chunks or [])
 
     # Custom question parameter formatted for the generic prompt
     question = (
         f"Clause to Analyze:\n{clause_text}\n\n"
-        f"Local Best-Guess Clause Type: {best_guess_type}"
+        f"Local Best-Guess Clause Type: {best_guess_type}\n\n"
+        f"## Case Law Precedents\n\n{precedents_str}"
     )
 
     # -------------------------------------------------------------------
@@ -527,4 +565,5 @@ def cascade_risk_assessment(
         best_guess_type,
         "Unable to get a valid response from any language model."
     )
+
 

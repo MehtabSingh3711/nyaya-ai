@@ -199,6 +199,17 @@ class ClauseExtraction(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# PrecedentCitation — citation pointing to a landmark case law precedent
+# ---------------------------------------------------------------------------
+class PrecedentCitation(BaseModel):
+    """A citation pointing to a relevant landmark case law precedent."""
+
+    case_name: str = Field(..., description="Name of the case, e.g. 'Mohiri Bibee v. Dharmodas Ghose'")
+    citation: str = Field(..., description="Official citation identifier, e.g. '(1903) 30 IA 114'")
+    core_holding: str = Field(..., description="The relevant judicial holding or ratio of the precedent")
+
+
+# ---------------------------------------------------------------------------
 # RiskFinding — an identified risk or conflict with statutory law
 # ---------------------------------------------------------------------------
 class RiskFinding(BaseModel):
@@ -226,6 +237,9 @@ class RiskFinding(BaseModel):
     )
     confidence: float = Field(
         ..., ge=0.0, le=1.0, description="Self-assessed analysis confidence"
+    )
+    relevant_precedents: List[PrecedentCitation] = Field(
+        default_factory=list, description="List of supporting case law precedents"
     )
 
 
@@ -269,8 +283,12 @@ class RiskAssessment(BaseModel):
     clause_type_detail: Optional[str] = Field(
         default=None, description="Refined sub-type detail"
     )
+    relevant_precedents: List[PrecedentCitation] = Field(
+        default_factory=list, description="List of supporting case law precedents"
+    )
 
     @model_validator(mode="after")
+
     def validate_risk_fields_present_when_risky(self) -> "RiskAssessment":
         """Verify that conflicting law fields are populated when risk_level is not 'none'."""
         if self.risk_level != "none":
@@ -313,4 +331,25 @@ class ContractScanResult(BaseModel):
         "ocr_required",
     ] = Field(..., description="Consolidated scanning status")
     message: str = Field(..., description="Summary status message for the user")
+
+
+# ---------------------------------------------------------------------------
+# PrecedentChunk — landmark case law stored in vector database (ADR-003)
+# ---------------------------------------------------------------------------
+class PrecedentChunk(BaseModel):
+    """Represent a landmark case law precedent stored in the vector database."""
+
+    case_name: str = Field(..., description="Name of the case, e.g. 'Mohiri Bibee v. Dharmodas Ghose'")
+    citation: str = Field(..., description="Official law citation identifier, e.g. '(1903) 30 IA 114'")
+    category: str = Field(..., description="Legal category or subject area, e.g. 'Minor's Agreement'")
+    key_issue: str = Field(..., description="The central legal question of the dispute")
+    core_holding: str = Field(..., description="The main ruling or ratio decidendi of the judges")
+    text: str = Field(..., description="The unified text representation for search and retrieval", min_length=1)
+    source: str = Field(default="curated_manifest", description="Provenance of the precedent data")
+    version: str = Field(default="v1", description="Database schema version tag")
+
+    def to_payload(self) -> dict:
+        """Convert to Qdrant payload dict for precedents storage."""
+        return self.model_dump(exclude_none=True)
+
 

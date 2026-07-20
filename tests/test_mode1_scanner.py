@@ -285,3 +285,49 @@ def test_scan_contract_ungrounded_finding_dropped(mock_pipeline):
     # Finding should be dropped due to failing grounding check
     assert len(res.findings) == 0
     assert res.status == "no_material_risks_found"
+
+
+def test_scan_contract_returns_precedents(mock_pipeline):
+    mock_extract, mock_qdrant, mock_cascade = mock_pipeline
+
+    mock_extract.return_value = ExtractedContract(
+        contract_name="employment.pdf",
+        pages=[ExtractedPage(page_number=1, text="1. Non-compete: Employee shall not compete.")],
+        status="success",
+    )
+
+    mock_qdrant.search.return_value = [
+        {
+            "act_name": "Indian Contract Act 1872",
+            "section_number": "27",
+            "text": "Every agreement in restraint of trade is void.",
+            "score": 0.85,
+        }
+    ]
+
+    from nyaya_ai.schemas import PrecedentCitation
+    mock_cascade.return_value = RiskAssessment(
+        risk_level="high",
+        conflicting_act="Indian Contract Act 1872",
+        conflicting_section="27",
+        conflicting_law_quote="restraint of trade is void",
+        explanation="Void under section 27.",
+        recommended_action="Remove.",
+        confidence=0.95,
+        clause_type="non_compete",
+        relevant_precedents=[
+            PrecedentCitation(
+                case_name="Superintendence Company of India v. Krishan Murgai",
+                citation="AIR 1980 SC 1717",
+                core_holding="Post-employment non-compete covenants are void ab initio."
+            )
+        ]
+    )
+
+    res = scan_contract(Path("employment.pdf"), relevance_threshold=0.4)
+
+    assert res.status == "risks_found"
+    assert len(res.findings) == 1
+    assert len(res.findings[0].relevant_precedents) == 1
+    assert res.findings[0].relevant_precedents[0].case_name == "Superintendence Company of India v. Krishan Murgai"
+
