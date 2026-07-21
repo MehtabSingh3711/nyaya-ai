@@ -55,6 +55,7 @@ EMBEDDING_DIM = 1024
 # faster ONNX CPU inference on local/HF Spaces deployments.
 # ---------------------------------------------------------------------------
 RERANKER_MODEL = "jinaai/jina-reranker-v1-turbo-en"
+JINA_API_KEY = os.getenv("JINA_API_KEY")
 
 # ---------------------------------------------------------------------------
 # LLM — 3-Tier Cloud Cascade (ADR-004)

@@ -45,31 +45,56 @@ def run_contract_scan_task(
         # 2. Get worker preloaded models
         embedder, reranker = get_celery_models()
 
-        # 3. Run the scanner
+        # 3. Run the scanner in a streaming queue
         path_obj = Path(temp_file_path)
-        scan_result = scan_contract(
+        all_findings = []
+        final_confidence = 1.0
+
+        from nyaya_ai.contracts.scanner import scan_contract_stream
+
+        for batch_findings, processed_count, current_status, scan_confidence in scan_contract_stream(
             file_path=path_obj,
             embedder=embedder,
             reranker=reranker,
             user_id=user_id,
-        )
+        ):
+            all_findings.extend(batch_findings)
+            final_confidence = scan_confidence
 
-        # 4. Calculate Overall Risk Level
-        overall_risk = "none"
-        if scan_result.findings:
-            risk_levels = [f.risk_level for f in scan_result.findings]
-            if "high" in risk_levels:
-                overall_risk = "high"
-            elif "medium" in risk_levels:
-                overall_risk = "medium"
-            elif "low" in risk_levels:
-                overall_risk = "low"
+            overall_risk = "none"
+            if all_findings:
+                risk_levels = [f.risk_level for f in all_findings]
+                if "high" in risk_levels:
+                    overall_risk = "high"
+                elif "medium" in risk_levels:
+                    overall_risk = "medium"
+                elif "low" in risk_levels:
+                    overall_risk = "low"
 
-        # 5. Update Database
+            # Update database with current progress (keep status as "processing")
+            scan_record.status = "processing"
+            scan_record.risk_level = overall_risk
+            scan_record.clause_count = processed_count
+            scan_record.results_json = json.dumps({
+                "contract_name": original_filename,
+                "total_clauses_scanned": processed_count,
+                "findings": [f.model_dump() for f in all_findings],
+                "scan_confidence": scan_confidence,
+                "status": "processing",
+                "message": f"Scan in progress... Analysed {processed_count} clauses."
+            })
+            db.commit()
+
+        # 4. Once loop exits, mark status as complete
         scan_record.status = "complete"
-        scan_record.risk_level = overall_risk
-        scan_record.clause_count = scan_result.total_clauses_scanned
-        scan_record.results_json = json.dumps(scan_result.model_dump())
+        scan_record.results_json = json.dumps({
+            "contract_name": original_filename,
+            "total_clauses_scanned": scan_record.clause_count,
+            "findings": [f.model_dump() for f in all_findings],
+            "scan_confidence": final_confidence,
+            "status": "complete",
+            "message": f"Scan complete. Identified {len(all_findings)} statutory risk findings."
+        })
 
     except Exception as e:
         scan_record = db.query(ScanRecord).filter(ScanRecord.scan_id == scan_id).first()
@@ -116,27 +141,54 @@ def run_contract_scan_task_local(
             reranker = Reranker()
 
         path_obj = Path(temp_file_path)
-        scan_result = scan_contract(
+        all_findings = []
+        final_confidence = 1.0
+
+        from nyaya_ai.contracts.scanner import scan_contract_stream
+
+        for batch_findings, processed_count, current_status, scan_confidence in scan_contract_stream(
             file_path=path_obj,
             embedder=embedder,
             reranker=reranker,
             user_id=user_id,
-        )
+        ):
+            all_findings.extend(batch_findings)
+            final_confidence = scan_confidence
 
-        overall_risk = "none"
-        if scan_result.findings:
-            risk_levels = [f.risk_level for f in scan_result.findings]
-            if "high" in risk_levels:
-                overall_risk = "high"
-            elif "medium" in risk_levels:
-                overall_risk = "medium"
-            elif "low" in risk_levels:
-                overall_risk = "low"
+            overall_risk = "none"
+            if all_findings:
+                risk_levels = [f.risk_level for f in all_findings]
+                if "high" in risk_levels:
+                    overall_risk = "high"
+                elif "medium" in risk_levels:
+                    overall_risk = "medium"
+                elif "low" in risk_levels:
+                    overall_risk = "low"
 
+            # Update database with current progress (keep status as "processing")
+            scan_record.status = "processing"
+            scan_record.risk_level = overall_risk
+            scan_record.clause_count = processed_count
+            scan_record.results_json = json.dumps({
+                "contract_name": original_filename,
+                "total_clauses_scanned": processed_count,
+                "findings": [f.model_dump() for f in all_findings],
+                "scan_confidence": scan_confidence,
+                "status": "processing",
+                "message": f"Scan in progress... Analysed {processed_count} clauses."
+            })
+            db.commit()
+
+        # Once loop exits, mark status as complete
         scan_record.status = "complete"
-        scan_record.risk_level = overall_risk
-        scan_record.clause_count = scan_result.total_clauses_scanned
-        scan_record.results_json = json.dumps(scan_result.model_dump())
+        scan_record.results_json = json.dumps({
+            "contract_name": original_filename,
+            "total_clauses_scanned": scan_record.clause_count,
+            "findings": [f.model_dump() for f in all_findings],
+            "scan_confidence": final_confidence,
+            "status": "complete",
+            "message": f"Scan complete. Identified {len(all_findings)} statutory risk findings."
+        })
 
     except Exception as e:
         scan_record = db.query(ScanRecord).filter(ScanRecord.scan_id == scan_id).first()

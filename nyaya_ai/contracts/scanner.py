@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
-from typing import Optional
+from typing import Optional, Generator
 
 from nyaya_ai.config import (
     CONTRACT_RELEVANCE_THRESHOLD,
@@ -83,7 +83,7 @@ def verify_grounding(assessment: RiskAssessment, retrieved_chunks: list[dict]) -
     return False
 
 
-def scan_contract(
+def scan_contract_stream(
     file_path: Path,
     *,
     relevance_threshold: float = CONTRACT_RELEVANCE_THRESHOLD,
@@ -92,23 +92,11 @@ def scan_contract(
     embedder: Optional[Embedder] = None,
     reranker: Optional[Reranker] = None,
     user_id: Optional[str] = None,
-) -> ContractScanResult:
-    """Extract, chunk, retrieve, gate, and assess contract risks.
-
-    Saves extracted clauses to Qdrant collection 'nyaya_contracts'.
-    Validates findings against retrieved context (grounding).
-
-    Args:
-        file_path: Path to the contract file (PDF or DOCX).
-        relevance_threshold: Permissive cosine similarity gate.
-        top_k: Number of retrieved statutory sections from nyaya_corpus.
-        verbose: Print detailed step-by-step evaluation logs to console.
-        embedder: Optional preloaded Embedder singleton.
-        reranker: Optional preloaded Reranker singleton.
-        user_id: Optional owner ID of the contract.
-
-    Returns:
-        ContractScanResult summary and detailed risk findings.
+) -> Generator[tuple[list[RiskFinding], int, str, float], None, None]:
+    """Generator version of contract scanner. 
+    
+    Processes clauses in small pipelining queues (batches of 3) to keep CPU overhead low 
+    and yields findings in real-time.
     """
     path = Path(file_path)
     contract_name = path.name
@@ -116,137 +104,64 @@ def scan_contract(
     # 1. Extract contract text
     extraction = extract_contract_text(path)
     if extraction.status == "ocr_required":
-        return ContractScanResult(
-            contract_name=contract_name,
-            total_clauses_scanned=0,
-            findings=[],
-            scan_confidence=0.0,
-            status="ocr_required",
-            message="Contract text extraction failed. Document appears to be a scanned image and requires OCR.",
-        )
+        yield [], 0, "ocr_required", 0.0
+        return
     elif extraction.status == "failure":
         raise ValueError(extraction.error_message or "Unknown extraction failure.")
 
     # 2. Chunk contract structurally
     clauses = chunk_contract(extraction, user_id=user_id)
-
     if not clauses:
-        return ContractScanResult(
-            contract_name=contract_name,
-            total_clauses_scanned=0,
-            findings=[],
-            scan_confidence=1.0,
-            status="no_material_risks_found",
-            message="Contract contains no readable clauses to scan.",
-        )
+        yield [], 0, "no_material_risks_found", 1.0
+        return
 
     if embedder is None:
         embedder = Embedder()
     if reranker is None:
         reranker = Reranker()
 
-    # 3. Index clauses into Qdrant 'nyaya_contracts' collection (ignoring failures)
+    # Index clauses into Qdrant 'nyaya_contracts' collection (ignoring failures)
     try:
         qdrant.create_collection("nyaya_contracts")
         clause_vectors = [embedder.embed_query(c.clause_text) for c in clauses]
         qdrant.upsert_chunks(clauses, clause_vectors, collection_name="nyaya_contracts")
     except Exception:
-        # Proceed even if local contract indexing fails, as it shouldn't block the scan
         pass
-
-    # 4. Assess risks for each clause
-    findings: list[RiskFinding] = []
-    scanned_count = 0
-    llm_scanned_count = 0
-    confidence_sum = 0.0
-
-    verbose_logs = []
-    if verbose:
-        from rich.console import Console
-        from rich.table import Table
-        from rich.panel import Panel
-        c_logger = Console()
-        
-        def log_verbose(msg: str):
-            c_logger.print(msg)
-            # Strip simple rich tags for the raw log file
-            import re
-            plain = re.sub(r"\[/?(?:bold|dim|italic|red|green|blue|cyan|magenta|yellow|white|/)[^\]]*?\]", "", msg)
-            verbose_logs.append(plain)
-            
-        log_verbose(
-            f"[bold cyan]Starting Verbose Diagnostic Scan[/]\n"
-            f"Contract: [cyan]{contract_name}[/]\n"
-            f"Clauses Found: [cyan]{len(clauses)}[/]"
-        )
-    else:
-        def log_verbose(msg: str):
-            pass
-
-    # Pre-embed all clauses in one batch pass (huge CPU speedup)
-    clause_texts = [c.clause_text for c in clauses]
-    hybrid_embeddings = embedder.embed_documents_hybrid(clause_texts, batch_size=32)
-
-    # 4. Assess risks for each clause in parallel
-    findings: list[RiskFinding] = []
-    scanned_count = 0
-    llm_scanned_count = 0
-    confidence_sum = 0.0
-
-    verbose_logs = []
-    if verbose:
-        from rich.console import Console
-        from rich.table import Table
-        from rich.panel import Panel
-        c_logger = Console()
-        
-        def log_verbose(msg: str):
-            c_logger.print(msg)
-            import re
-            plain = re.sub(r"\[/?(?:bold|dim|italic|red|green|blue|cyan|magenta|yellow|white|/)[^\]]*?\]", "", msg)
-            verbose_logs.append(plain)
-            
-        log_verbose(
-            f"[bold cyan]Starting Verbose Diagnostic Scan[/]\n"
-            f"Contract: [cyan]{contract_name}[/]\n"
-            f"Clauses Found: [cyan]{len(clauses)}[/]"
-        )
-    else:
-        def log_verbose(msg: str):
-            pass
 
     # ThreadPool execution function for concurrent processing
     from concurrent.futures import ThreadPoolExecutor
-    
-    def process_single_clause(clause_idx: int, clause):
+
+    def process_single_clause(clause, delay: float = 0.0):
         best_guess_type, best_guess_detail = classify_clause(clause.clause_text)
 
-        # Retrieve vectors from the pre-embedded batch output
-        dense_vec = hybrid_embeddings.dense[clause_idx]
-        sparse_vec = hybrid_embeddings.sparse[clause_idx]
-
-        # Retrieve applicable law chunks via hybrid search (concurrent Qdrant call)
+        # Single clause embedding (fast on CPU with batch size 1)
+        query_hybrid = embedder.embed_query_hybrid(clause.clause_text)
         candidates = qdrant.search(
-            query_vector=dense_vec,
-            sparse_vector=sparse_vec,
+            query_vector=query_hybrid.dense,
+            sparse_vector=query_hybrid.sparse,
             top_k=RERANK_CANDIDATES,
             collection_name="nyaya_corpus",
         )
 
-        # Cross-encoder rerank → top_k best matches
+        # Introduce staggered delay to avoid parallel rate-limiting on Jina API
+        if delay > 0:
+            import time
+            time.sleep(delay)
+
+        # Cross-encoder rerank
         retrieved_chunks = reranker.rerank(
             query=clause.clause_text,
             candidates=candidates,
             top_k=top_k,
         )
 
-        # Retrieve matching case law precedents from nyaya_precedents (concurrent Qdrant call)
+        # Precedents
         precedent_chunks = []
         try:
             from nyaya_ai.config import PRECEDENTS_COLLECTION_NAME
             precedent_candidates = qdrant.search(
-                query_vector=dense_vec,
-                sparse_vector=sparse_vec,
+                query_vector=query_hybrid.dense,
+                sparse_vector=query_hybrid.sparse,
                 top_k=3,
                 collection_name=PRECEDENTS_COLLECTION_NAME,
             )
@@ -254,7 +169,6 @@ def scan_contract(
         except Exception:
             pass
 
-        # Relevance pre-filter gate (using reranker score)
         max_score = max([c["rerank_score"] for c in retrieved_chunks]) if retrieved_chunks else 0.0
 
         if max_score < relevance_threshold:
@@ -290,53 +204,96 @@ def scan_contract(
 
         return finding, assessment.clause_type, assessment.clause_type_detail, assessment.confidence, True
 
-    # Run execution loop concurrently (supports up to 8 parallel requests to Groq/Gemini/Qdrant)
-    with ThreadPoolExecutor(max_workers=8) as executor:
-        futures = [executor.submit(process_single_clause, i, c) for i, c in enumerate(clauses)]
-        for idx, future in enumerate(futures):
-            clause = clauses[idx]
-            try:
-                finding, c_type, c_detail, confidence, passed_gate = future.result()
-                clause.clause_type = c_type
-                clause.clause_type_detail = c_detail
+    # Pipelined small-batch queue (batches of 2)
+    findings = []
+    scanned_count = 0
+    llm_scanned_count = 0
+    confidence_sum = 0.0
 
-                if passed_gate:
-                    scanned_count += 1
-                    confidence_sum += confidence
-                    llm_scanned_count += 1
-                    if finding:
-                        findings.append(finding)
-            except Exception as thread_err:
-                print(f"[Error] Thread execution failure on clause #{clause.clause_number}: {thread_err}")
+    batch_size = 2
+    for i in range(0, len(clauses), batch_size):
+        batch = clauses[i : i + batch_size]
+        batch_findings = []
 
-    # 5. Assemble scan summary status
-    scan_confidence = confidence_sum / llm_scanned_count if llm_scanned_count > 0 else 1.0
+        with ThreadPoolExecutor(max_workers=len(batch)) as executor:
+            futures = [executor.submit(process_single_clause, c, float(idx * 1.0)) for idx, c in enumerate(batch)]
+            for idx, future in enumerate(futures):
+                clause = batch[idx]
+                try:
+                    finding, c_type, c_detail, confidence, passed_gate = future.result()
+                    clause.clause_type = c_type
+                    clause.clause_type_detail = c_detail
 
-    if findings:
-        status = "risks_found"
-        message = f"Scan complete. Identified {len(findings)} statutory risk findings."
-    elif scanned_count > 0:
-        status = "no_material_risks_found"
+                    if passed_gate:
+                        scanned_count += 1
+                        confidence_sum += confidence
+                        llm_scanned_count += 1
+                        if finding:
+                            batch_findings.append(finding)
+                            findings.append(finding)
+                except Exception as thread_err:
+                    print(f"[Error] Thread execution failure on clause #{clause.clause_number}: {thread_err}")
+
+        # Determine intermediate status
+        current_status = "processing"
+        if findings:
+            current_status = "risks_found"
+        elif i + batch_size >= len(clauses):
+            current_status = "no_material_risks_found" if scanned_count > 0 else "insufficient_evidence"
+
+        scan_confidence = confidence_sum / llm_scanned_count if llm_scanned_count > 0 else 1.0
+        yield batch_findings, min(i + batch_size, len(clauses)), current_status, scan_confidence
+
+
+def scan_contract(
+    file_path: Path,
+    *,
+    relevance_threshold: float = CONTRACT_RELEVANCE_THRESHOLD,
+    top_k: int = CONTRACT_RISK_TOP_K,
+    verbose: bool = False,
+    embedder: Optional[Embedder] = None,
+    reranker: Optional[Reranker] = None,
+    user_id: Optional[str] = None,
+) -> ContractScanResult:
+    """Extract, chunk, retrieve, gate, and assess contract risks.
+
+    Maintains backward compatibility by consuming the streaming generator.
+    """
+    path = Path(file_path)
+    contract_name = path.name
+    all_findings = []
+    final_count = 0
+    final_status = "processing"
+    final_confidence = 1.0
+
+    # Consume streaming generator to the end
+    for batch_findings, processed_count, status, confidence in scan_contract_stream(
+        file_path,
+        relevance_threshold=relevance_threshold,
+        top_k=top_k,
+        verbose=verbose,
+        embedder=embedder,
+        reranker=reranker,
+        user_id=user_id,
+    ):
+        all_findings.extend(batch_findings)
+        final_count = processed_count
+        final_status = status
+        final_confidence = confidence
+
+    # Final summary message matching expected schema outputs
+    if final_status == "risks_found":
+        message = f"Scan complete. Identified {len(all_findings)} statutory risk findings."
+    elif final_status == "no_material_risks_found":
         message = "Scan complete. No material statutory risks identified in the contract."
     else:
-        status = "insufficient_evidence"
         message = "Scan complete. No material risks identified, but retrieval found no relevant Indian laws to evaluate against."
-
-    if verbose:
-        log_verbose(f"\n[bold green]✓ Diagnostic Scan Complete![/] Status: {status.upper()} | Findings: {len(findings)}\n")
-        # Save plain text log to scan_debug.txt
-        try:
-            with open("scan_debug.txt", "w", encoding="utf-8") as f:
-                f.write("\n".join(verbose_logs))
-            c_logger.print("[dim cyan]Detailed log saved to scan_debug.txt[/]")
-        except Exception as e:
-            c_logger.print(f"[red]Failed to save log to scan_debug.txt: {e}[/]")
 
     return ContractScanResult(
         contract_name=contract_name,
-        total_clauses_scanned=len(clauses),
-        findings=findings,
-        scan_confidence=scan_confidence,
-        status=status,
+        total_clauses_scanned=final_count,
+        findings=all_findings,
+        scan_confidence=final_confidence,
+        status=final_status,
         message=message,
     )

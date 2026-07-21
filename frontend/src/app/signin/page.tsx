@@ -100,7 +100,10 @@ export default function SignInPage() {
         <div className="absolute inset-0 dot-pattern pointer-events-none"></div>
 
         {/* Logo */}
-        <div className="relative z-10 flex items-center gap-3">
+        <div 
+          onClick={() => router.push('/')}
+          className="relative z-10 flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+        >
           <NyayaLogo height={32} />
           <div>
             <div className="font-display font-semibold text-[15px] tracking-tight leading-none text-primary">
@@ -171,7 +174,11 @@ export default function SignInPage() {
         <div className="w-full max-w-md bg-surface border-kite rounded-xl p-8 lg:p-10 shadow-sm">
           {/* Logo Header */}
           <div className="flex flex-col items-center mb-8">
-            <NyayaLogo height={44} className="mb-4" />
+            <NyayaLogo 
+              height={44} 
+              className="mb-4 cursor-pointer hover:opacity-80 transition-opacity" 
+              onClick={() => router.push('/')}
+            />
             <h2 className="font-display text-2xl font-bold text-primary">
               {tab === 'signin' ? 'Welcome to Nyaya' : 'Start your free trial'}
             </h2>

@@ -408,7 +408,7 @@ def get_scan_result_endpoint(
         "results": None
     }
 
-    if scan_record.status in ("complete", "failed") and scan_record.results_json:
+    if scan_record.status in ("complete", "failed", "processing") and scan_record.results_json:
         try:
             response_data["results"] = json.loads(scan_record.results_json)
         except Exception:

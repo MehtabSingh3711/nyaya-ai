@@ -122,6 +122,9 @@ export default function ContractScannerPage() {
           setScanRecord(data);
           setLoading(false);
           alert('Scanning failed. Document format may be unsupported.');
+        } else {
+          // Live status updates from generator
+          setScanRecord(data);
         }
       } catch (err) {
         clearInterval(interval);
@@ -245,8 +248,8 @@ export default function ContractScannerPage() {
     );
   }
 
-  // Active Ingestion / Scanning state
-  if (scanRecord && scanRecord.status === 'processing') {
+  // Active Ingestion / Scanning state (spinner shows only until the first batch of clauses are analyzed)
+  if (scanRecord && scanRecord.status === 'processing' && (scanRecord.clause_count === 0)) {
     return (
       <div className="min-h-screen bg-page flex flex-col transition-all duration-300">
         <Header workspaceLabel="Mode 1: Compliance Scan" />
@@ -348,7 +351,10 @@ export default function ContractScannerPage() {
           <div className="h-4 w-px bg-[var(--black-kite-15)] hidden sm:block"></div>
 
           <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-safe-text animate-pulse"></span>
+            <span className={`w-1.5 h-1.5 rounded-full ${
+              scanRecord.status === 'processing' ? 'bg-[var(--toxic-orange)] animate-pulse' :
+              scanRecord.status === 'failed' ? 'bg-red-500' : 'bg-safe-text'
+            }`}></span>
             <span className="font-semibold text-primary truncate max-w-[200px]" title={scanRecord.contract_name}>
               {scanRecord.contract_name}
             </span>
@@ -432,9 +438,21 @@ export default function ContractScannerPage() {
           <div className="flex-1 overflow-y-auto">
             {filteredFindings.length === 0 ? (
               <div className="p-6 text-center text-secondary">
-                <CheckCircle className="w-8 h-8 text-safe-text mx-auto mb-2" />
-                <p className="text-xs font-semibold">No active risks matched.</p>
-                <p className="text-[10px] text-muted mt-1">This clause selection is clean.</p>
+                {scanRecord.status === 'processing' ? (
+                  <>
+                    <Loader2 className="w-8 h-8 text-[var(--toxic-orange)] animate-spin mx-auto mb-2" />
+                    <p className="text-xs font-semibold">Scanning clauses...</p>
+                    <p className="text-[10px] text-muted mt-1 font-mono">
+                      Analyzed {scanRecord.clause_count} clauses
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-8 h-8 text-safe-text mx-auto mb-2" />
+                    <p className="text-xs font-semibold">No active risks matched.</p>
+                    <p className="text-[10px] text-muted mt-1">This clause selection is clean.</p>
+                  </>
+                )}
               </div>
             ) : (
               filteredFindings.map((f, idx) => (
@@ -501,13 +519,27 @@ export default function ContractScannerPage() {
             </div>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center bg-surface border-kite rounded-xl p-6 text-center">
-              <CheckCircle className="w-16 h-16 text-safe-text mb-4 animate-bounce" />
-              <h3 className="font-display font-bold text-xl text-primary">
-                Contract Ingestion Clean
-              </h3>
-              <p className="text-sm text-secondary mt-1 max-w-sm mx-auto leading-relaxed">
-                No active statutory compliance risks matched the current filter. The clauses operate in alignment with Central Acts.
-              </p>
+              {scanRecord.status === 'processing' ? (
+                <>
+                  <Loader2 className="w-16 h-16 text-[var(--toxic-orange)] mb-4 animate-spin" />
+                  <h3 className="font-display font-bold text-xl text-primary">
+                    Scanning Clauses...
+                  </h3>
+                  <p className="text-sm text-secondary mt-1 max-w-sm mx-auto leading-relaxed">
+                    Auditing clauses against Central Acts and Landmark Case Law. Findings will appear here in real-time.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="w-16 h-16 text-safe-text mb-4 animate-bounce" />
+                  <h3 className="font-display font-bold text-xl text-primary">
+                    Contract Ingestion Clean
+                  </h3>
+                  <p className="text-sm text-secondary mt-1 max-w-sm mx-auto leading-relaxed">
+                    No active statutory compliance risks matched the current filter. The clauses operate in alignment with Central Acts.
+                  </p>
+                </>
+              )}
             </div>
           )}
         </section>
@@ -594,7 +626,7 @@ export default function ContractScannerPage() {
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex items-center justify-center p-6 text-center text-muted">
+            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-muted">
               <Compass className="w-10 h-10 mb-2 opacity-40 block mx-auto" />
               <p className="text-xs">No active risk selected.</p>
               <p className="text-[10px] opacity-75 mt-1">Choose a flagged clause from the navigator to view statutory arguments.</p>

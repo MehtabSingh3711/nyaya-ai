@@ -22,6 +22,13 @@ export default function Header({
   const router = useRouter();
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [username, setUsername] = useState<string>('User');
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  const notifications = [
+    { id: 1, text: 'Welcome to Nyaya AI: Auditing against 33,000+ statutes.', time: 'System' },
+    { id: 2, text: 'Central Acts and Precedents indices fully operational.', time: 'Active' },
+    { id: 3, text: 'Local ONNX reranker fallback active.', time: 'Dev' },
+  ];
 
   useEffect(() => {
     // Resolve theme on client mount
@@ -115,11 +122,32 @@ export default function Header({
         )}
 
         {/* Right side settings, toggles, profile */}
-        <div className="flex items-center gap-4">
-          <button className="relative text-secondary hover:text-primary p-1 rounded-full hover:bg-page transition-colors">
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[var(--toxic-orange)] rounded-full"></span>
-          </button>
+        <div className="flex items-center gap-4 relative">
+          <div className="relative">
+            <button 
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="relative text-secondary hover:text-primary p-1 rounded-full hover:bg-page transition-colors"
+            >
+              <Bell className="w-5 h-5" />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[var(--toxic-orange)] rounded-full"></span>
+            </button>
+
+            {showNotifications && (
+              <div className="absolute right-0 top-10 w-72 bg-surface border-kite rounded-lg shadow-lg z-50 p-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                <h4 className="font-display font-semibold text-xs text-primary mb-3 pb-2 border-b border-[var(--black-kite-15)]">
+                  Notifications
+                </h4>
+                <div className="space-y-3">
+                  {notifications.map((n) => (
+                    <div key={n.id} className="text-[11px] leading-normal text-secondary border-b border-[var(--black-kite-5)] last:border-0 pb-2 last:pb-0">
+                      <p>{n.text}</p>
+                      <span className="text-[9px] text-muted font-mono uppercase tracking-wider block mt-1">{n.time}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
 
           <button
             className="theme-toggle"

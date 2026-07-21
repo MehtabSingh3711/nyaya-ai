@@ -21,35 +21,38 @@ from __future__ import annotations
 
 from rich.console import Console
 
-from nyaya_ai.config import RERANKER_MODEL
+from nyaya_ai.config import RERANKER_MODEL, JINA_API_KEY
 
 console = Console()
 
 
 class Reranker:
-    """Cross-encoder reranker using jina-reranker-v1-turbo-en.
+    """Cross-encoder reranker using Jina Reranker Cloud API (or local ONNX fallback).
 
-    Loads the model on first instantiation. Downloads ~150 MB on first run
-    (cached by HuggingFace).
-
-    Usage:
-        reranker = Reranker()
-        reranked = reranker.rerank(
-            query="non-compete clause enforceability",
-            candidates=[{"text": "...", "score": 0.8, ...}, ...],
-            top_k=5,
-        )
+    If JINA_API_KEY is present in config, reranking is executed on Jina's cloud endpoints
+    for high speed and zero local memory consumption. If absent or offline, falls back
+    to running the local cross-encoder model via ONNX.
     """
 
     def __init__(self) -> None:
-        from fastembed.rerank.cross_encoder import TextCrossEncoder
+        self._model = None
+        if JINA_API_KEY:
+            console.print("[green]Jina Reranker Cloud API initialized (Online Mode).[/]")
+        else:
+            console.print("[yellow]JINA_API_KEY not configured. Running local ONNX Reranker.[/]")
 
-        console.print(
-            f"[bold blue]Loading ONNX reranker: {RERANKER_MODEL}...[/]\n"
-            f"  (First run downloads model — cached for future runs)"
-        )
-        self._model = TextCrossEncoder(model_name=RERANKER_MODEL)
-        console.print("[green]  ONNX Reranker loaded.[/]")
+    def _score_locally(self, query: str, prefixed_texts: list[str]) -> list[float]:
+        """Lazy-loads and executes local ONNX cross-encoder scoring."""
+        if self._model is None:
+            from fastembed.rerank.cross_encoder import TextCrossEncoder
+
+            console.print(
+                f"[bold blue]Loading local ONNX reranker: {RERANKER_MODEL}...[/]\n"
+                f"  (First run downloads model — cached for future runs)"
+            )
+            self._model = TextCrossEncoder(model_name=RERANKER_MODEL)
+            console.print("[green]  ONNX Reranker loaded.[/]")
+        return list(self._model.rerank(query=query, documents=prefixed_texts))
 
     def rerank(
         self,
@@ -58,7 +61,7 @@ class Reranker:
         top_k: int = 5,
         text_key: str = "text",
     ) -> list[dict]:
-        """Rerank candidates using cross-encoder scoring via FastEmbed (ONNX).
+        """Rerank candidates using Jina Cloud Reranker or local fallback.
 
         Each candidate dict must contain a text field (default key: "text")
         that will be paired with the query for cross-encoder scoring.
@@ -87,8 +90,50 @@ class Reranker:
             prefix = f"{act} Section {section}: " if act else ""
             prefixed_texts.append(f"{prefix}{cand_text}")
 
-        # Score using FastEmbed's ONNX reranker (returns float scores in original order)
-        scores = list(self._model.rerank(query=query, documents=prefixed_texts))
+        scores = []
+        if JINA_API_KEY:
+            try:
+                import requests
+                import time
+                import random
+                url = "https://api.jina.ai/v1/rerank"
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {JINA_API_KEY}"
+                }
+                payload = {
+                    "model": "jina-reranker-v1-turbo-en",
+                    "query": query,
+                    "documents": prefixed_texts,
+                    "top_n": len(prefixed_texts)
+                }
+                
+                response = None
+                for attempt in range(4):
+                    try:
+                        response = requests.post(url, json=payload, headers=headers, timeout=5.0)
+                        if response.status_code == 429:
+                            # 429 rate limit hit, sleep with jitter and retry
+                            sleep_dur = 1.0 + attempt * 1.0 + random.random()
+                            time.sleep(sleep_dur)
+                            continue
+                        response.raise_for_status()
+                        break
+                    except (requests.RequestException, Exception) as req_err:
+                        if attempt == 3:
+                            raise req_err
+                        time.sleep(1.0 + random.random())
+                
+                # Jina API returns results list ordered by relevance
+                results = response.json().get("results", [])
+                scores = [0.0] * len(prefixed_texts)
+                for item in results:
+                    scores[item["index"]] = float(item["relevance_score"])
+            except Exception as e:
+                console.print(f"[red][Warning] Jina API Reranking failed: {e}. Falling back to local ONNX.[/]")
+                scores = self._score_locally(query, prefixed_texts)
+        else:
+            scores = self._score_locally(query, prefixed_texts)
 
         # Map scores back to original candidate dicts
         scored_candidates = []
