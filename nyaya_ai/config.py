@@ -67,7 +67,7 @@ RERANKER_MODEL = "jinaai/jina-reranker-v1-turbo-en"
 # Tier 1 — Groq
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
-GROQ_MODEL = "qwen/qwen3.6-27b"
+GROQ_MODEL = "llama-3.3-70b-versatile"
 
 # Tier 2 — Gemini (via OpenAI-compatible endpoint)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -78,10 +78,6 @@ GEMINI_MODEL = "gemini-3.1-flash-lite"
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 OPENROUTER_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"  # free-tier model
-
-# Ollama (local fallback — kept for offline dev)
-OLLAMA_BASE_URL = "http://localhost:11434/v1"
-OLLAMA_MODEL = "llama3.2:3b"
 
 # ---------------------------------------------------------------------------
 # Cascade thresholds (ADR-004)
@@ -97,7 +93,6 @@ MAX_RETRIES = 1          # retries at same tier before escalation
 # ---------------------------------------------------------------------------
 RERANK_CANDIDATES = 100   # candidates fetched from hybrid search (pre-rerank)
 FINAL_TOP_K = 5          # chunks passed to LLM after reranking
-TOP_K = 5                # backward compat alias for FINAL_TOP_K
 
 # ---------------------------------------------------------------------------
 # Corpus versioning
@@ -110,7 +105,6 @@ CORPUS_VERSION = "v1"
 HF_DATASETS = {
     "primary": "mratanusarkar/Indian-Laws",          # pre-sectioned
     "secondary": "geekyrakshit/indian-legal-acts",   # raw text, needs chunking
-    "optional": "Sahi19/IndianLawComplete",           # may not exist
 }
 
 # ---------------------------------------------------------------------------

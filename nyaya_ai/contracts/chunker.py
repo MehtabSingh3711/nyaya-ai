@@ -21,7 +21,7 @@ NUMBERED_PATTERN = re.compile(
 )
 
 
-def chunk_contract(extraction: ExtractedContract) -> list[ClauseExtraction]:
+def chunk_contract(extraction: ExtractedContract, user_id: Optional[str] = None) -> list[ClauseExtraction]:
     """Split the extracted contract text into structural clauses.
 
     Combines two strategies:
@@ -32,6 +32,7 @@ def chunk_contract(extraction: ExtractedContract) -> list[ClauseExtraction]:
 
     Args:
         extraction: The ExtractedContract result.
+        user_id: Optional owner ID of the contract.
 
     Returns:
         List of ClauseExtraction objects with clause_type='other'.
@@ -107,6 +108,7 @@ def chunk_contract(extraction: ExtractedContract) -> list[ClauseExtraction]:
             clauses.append(
                 ClauseExtraction(
                     contract_id=contract_id,
+                    user_id=user_id,
                     contract_name=contract_name,
                     clause_number=str(i),
                     clause_text=p,
@@ -130,6 +132,7 @@ def chunk_contract(extraction: ExtractedContract) -> list[ClauseExtraction]:
         clauses.append(
             ClauseExtraction(
                 contract_id=contract_id,
+                user_id=user_id,
                 contract_name=contract_name,
                 clause_number=clause_num,
                 clause_text=clause_text,
@@ -139,3 +142,4 @@ def chunk_contract(extraction: ExtractedContract) -> list[ClauseExtraction]:
         )
 
     return clauses
+

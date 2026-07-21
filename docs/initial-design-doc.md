@@ -38,7 +38,7 @@ User input (PDF / DOCX / chat question)
         │                            Statutes + Case Precedents
         ▼                                      │
    Structural Chunking                         │
- (Clause patterns, symbols)                    │
+  (Clause patterns, symbols)                    │
         │                                      │
         └──────────────┬───────────────────────┘
                        ▼

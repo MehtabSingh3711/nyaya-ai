@@ -43,6 +43,15 @@ def override_get_db():
 
 app.dependency_overrides[get_db] = override_get_db
 
+from nyaya_ai.api.main import get_current_user
+from nyaya_ai.api.database import User
+
+def override_get_current_user():
+    return User(user_id=None, username="testuser", hashed_password="mocked_password")
+
+app.dependency_overrides[get_current_user] = override_get_current_user
+
+
 @pytest.fixture(autouse=True)
 def setup_database():
     """Initializes in-memory database schema before each test, and drops it after."""
@@ -358,3 +367,33 @@ def test_chat_sessions_crud():
     assert db.query(ChatMessage).filter(ChatMessage.session_id == "session_123").count() == 0
     db.close()
 
+
+def test_auth_signup_signin():
+    """Test user registration, duplicate user prevention, and signin token validation."""
+    client = TestClient(app)
+
+    # 1. Sign up a new user
+    signup_payload = {"username": "testuser1", "password": "securepassword"}
+    response = client.post("/api/v1/auth/signup", json=signup_payload)
+    assert response.status_code == 200
+    signup_data = response.json()
+    assert "access_token" in signup_data
+    assert signup_data["username"] == "testuser1"
+
+    # 2. Prevent duplicate user signup
+    response = client.post("/api/v1/auth/signup", json=signup_payload)
+    assert response.status_code == 400
+    assert "already registered" in response.json()["detail"]
+
+    # 3. Sign in successfully
+    response = client.post("/api/v1/auth/signin", json=signup_payload)
+    assert response.status_code == 200
+    signin_data = response.json()
+    assert "access_token" in signin_data
+    assert signin_data["username"] == "testuser1"
+
+    # 4. Sign in with invalid password
+    invalid_signin = {"username": "testuser1", "password": "wrongpassword"}
+    response = client.post("/api/v1/auth/signin", json=invalid_signin)
+    assert response.status_code == 401
+    assert "Invalid username" in response.json()["detail"]

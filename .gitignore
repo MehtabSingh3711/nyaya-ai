@@ -49,3 +49,13 @@ mlruns/
 # Logs
 *.log
 logs/
+scan_debug.txt
+
+# Nyaya AI local database and uploads
+nyaya_history.db
+temp_uploads/
+
+# IDE and agent settings/configs
+CLAUDE.md
+AGENTS.md
+.claude/

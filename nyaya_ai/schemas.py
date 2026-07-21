@@ -175,7 +175,9 @@ class ClauseExtraction(BaseModel):
     """Represent a structured clause extracted from a user's contract."""
 
     contract_id: str = Field(..., description="Unique ID for the contract")
+    user_id: Optional[str] = Field(default=None, description="Owner of the contract")
     contract_name: str = Field(..., description="Name of the contract file")
+
     clause_number: str = Field(..., description="Clause section number or key")
     clause_text: str = Field(..., description="Verbatim text of the clause")
     page: int = Field(..., description="1-indexed page number (0 if not applicable)")
@@ -288,7 +290,6 @@ class RiskAssessment(BaseModel):
     )
 
     @model_validator(mode="after")
-
     def validate_risk_fields_present_when_risky(self) -> "RiskAssessment":
         """Verify that conflicting law fields are populated when risk_level is not 'none'."""
         if self.risk_level != "none":

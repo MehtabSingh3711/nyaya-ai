@@ -1,23 +1,30 @@
 # Core dependencies
-qdrant-client>=1.7.0
-FlagEmbedding>=1.2.0
-sentence-transformers>=2.2.0
-datasets>=2.14.0
-pymupdf>=1.23.0
-pydantic>=2.0.0
-openai>=1.0.0
-rich>=13.0.0
-python-docx>=1.1.0
+qdrant-client
+FlagEmbedding
+sentence-transformers
+datasets
+pymupdf
+pydantic
+openai
+rich
+python-docx
+python-dotenv
+fastembed
 
 # FastAPI Backend & Database
-fastapi>=0.100.0
-uvicorn>=0.22.0
-sqlalchemy>=2.0.0
-python-multipart>=0.0.6
+fastapi
+uvicorn
+sqlalchemy
+python-multipart
+celery
+redis
+pyjwt
+bcrypt
 
 # PDF Report Export
-reportlab>=4.0.0
+reportlab
 
 # Testing
-pytest>=7.0.0
-httpx>=0.24.0
+pytest
+httpx
+

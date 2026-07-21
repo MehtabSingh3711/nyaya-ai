@@ -1,5 +1,0 @@
-huggingface.co/datasets/geekyrakshit/indian-legal-acts
-huggingface.co/datasets/mratanusarkar/Indian-Laws
-huggingface.co/datasets/Sahi19/IndianLawComplete
-huggingface.co/datasets/viber1/indian-law-dataset
-huggingface.co/datasets/nisaar/Lawyer_GPT_India

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
+from typing import Optional
+
 from nyaya_ai.config import (
     CONTRACT_RELEVANCE_THRESHOLD,
     CONTRACT_RISK_TOP_K,
@@ -89,6 +91,7 @@ def scan_contract(
     verbose: bool = False,
     embedder: Optional[Embedder] = None,
     reranker: Optional[Reranker] = None,
+    user_id: Optional[str] = None,
 ) -> ContractScanResult:
     """Extract, chunk, retrieve, gate, and assess contract risks.
 
@@ -102,6 +105,7 @@ def scan_contract(
         verbose: Print detailed step-by-step evaluation logs to console.
         embedder: Optional preloaded Embedder singleton.
         reranker: Optional preloaded Reranker singleton.
+        user_id: Optional owner ID of the contract.
 
     Returns:
         ContractScanResult summary and detailed risk findings.
@@ -124,7 +128,8 @@ def scan_contract(
         raise ValueError(extraction.error_message or "Unknown extraction failure.")
 
     # 2. Chunk contract structurally
-    clauses = chunk_contract(extraction)
+    clauses = chunk_contract(extraction, user_id=user_id)
+
     if not clauses:
         return ContractScanResult(
             contract_name=contract_name,
@@ -135,7 +140,6 @@ def scan_contract(
             message="Contract contains no readable clauses to scan.",
         )
 
-    from typing import Optional
     if embedder is None:
         embedder = Embedder()
     if reranker is None:
@@ -179,14 +183,52 @@ def scan_contract(
         def log_verbose(msg: str):
             pass
 
-    for clause in clauses:
+    # Pre-embed all clauses in one batch pass (huge CPU speedup)
+    clause_texts = [c.clause_text for c in clauses]
+    hybrid_embeddings = embedder.embed_documents_hybrid(clause_texts, batch_size=32)
+
+    # 4. Assess risks for each clause in parallel
+    findings: list[RiskFinding] = []
+    scanned_count = 0
+    llm_scanned_count = 0
+    confidence_sum = 0.0
+
+    verbose_logs = []
+    if verbose:
+        from rich.console import Console
+        from rich.table import Table
+        from rich.panel import Panel
+        c_logger = Console()
+        
+        def log_verbose(msg: str):
+            c_logger.print(msg)
+            import re
+            plain = re.sub(r"\[/?(?:bold|dim|italic|red|green|blue|cyan|magenta|yellow|white|/)[^\]]*?\]", "", msg)
+            verbose_logs.append(plain)
+            
+        log_verbose(
+            f"[bold cyan]Starting Verbose Diagnostic Scan[/]\n"
+            f"Contract: [cyan]{contract_name}[/]\n"
+            f"Clauses Found: [cyan]{len(clauses)}[/]"
+        )
+    else:
+        def log_verbose(msg: str):
+            pass
+
+    # ThreadPool execution function for concurrent processing
+    from concurrent.futures import ThreadPoolExecutor
+    
+    def process_single_clause(clause_idx: int, clause):
         best_guess_type, best_guess_detail = classify_clause(clause.clause_text)
 
-        # Retrieve applicable law chunks via hybrid search
-        query_hybrid = embedder.embed_query_hybrid(clause.clause_text)
+        # Retrieve vectors from the pre-embedded batch output
+        dense_vec = hybrid_embeddings.dense[clause_idx]
+        sparse_vec = hybrid_embeddings.sparse[clause_idx]
+
+        # Retrieve applicable law chunks via hybrid search (concurrent Qdrant call)
         candidates = qdrant.search(
-            query_vector=query_hybrid.dense,
-            sparse_vector=query_hybrid.sparse,
+            query_vector=dense_vec,
+            sparse_vector=sparse_vec,
             top_k=RERANK_CANDIDATES,
             collection_name="nyaya_corpus",
         )
@@ -198,69 +240,27 @@ def scan_contract(
             top_k=top_k,
         )
 
-        # Retrieve matching case law precedents from nyaya_precedents (dense + sparse hybrid)
+        # Retrieve matching case law precedents from nyaya_precedents (concurrent Qdrant call)
         precedent_chunks = []
         try:
             from nyaya_ai.config import PRECEDENTS_COLLECTION_NAME
             precedent_candidates = qdrant.search(
-                query_vector=query_hybrid.dense,
-                sparse_vector=query_hybrid.sparse,
-                top_k=3,  # Retrieve top-3 most relevant precedents
+                query_vector=dense_vec,
+                sparse_vector=sparse_vec,
+                top_k=3,
                 collection_name=PRECEDENTS_COLLECTION_NAME,
             )
             precedent_chunks = precedent_candidates
-        except Exception as e:
-            if verbose:
-                log_verbose(f"[yellow]Failed to retrieve precedents from Qdrant: {e}[/]")
+        except Exception:
+            pass
 
         # Relevance pre-filter gate (using reranker score)
         max_score = max([c["rerank_score"] for c in retrieved_chunks]) if retrieved_chunks else 0.0
 
-        if verbose:
-            log_verbose(f"\n[bold blue]Evaluating Clause #{clause.clause_number} (Page {clause.page})[/]")
-            log_verbose(f"[dim]Clause Text:[/] [italic]\"{clause.clause_text.strip()}\"[/]")
-            log_verbose(f"[dim]Classifier Guess:[/] [cyan]{best_guess_type}[/] ({best_guess_detail})")
-            log_verbose(
-                f"Relevance Gate Score (Max Reranker): [bold yellow]{max_score:.4f}[/] "
-                f"(Threshold: {relevance_threshold})"
-            )
-            
-            # Log retrieved candidates in a clean plain format for the file log
-            log_verbose("Top Retrieved Candidates:")
-            for idx, chunk in enumerate(retrieved_chunks, 1):
-                log_verbose(
-                    f"  {idx}. Act: {chunk.get('act_name')} | Sec: {chunk.get('section_number')} | "
-                    f"Rerank Score: {chunk.get('rerank_score', 0.0):.4f}"
-                )
-            
-            # Print table to console only (since Table is a rich object)
-            table = Table(show_header=True, header_style="bold magenta", box=None)
-            table.add_column("Rank", justify="center")
-            table.add_column("Act", justify="left")
-            table.add_column("Section", justify="center")
-            table.add_column("Rerank Score", justify="right")
-            for idx, chunk in enumerate(retrieved_chunks, 1):
-                table.add_row(
-                    str(idx),
-                    chunk.get("act_name", "Unknown"),
-                    chunk.get("section_number", "?"),
-                    f"{chunk.get('rerank_score', 0.0):.4f}",
-                )
-            c_logger.print(table)
-
         if max_score < relevance_threshold:
-            if verbose:
-                log_verbose("[yellow]Gate Result: SKIPPED (Below relevance threshold)[/]")
-            # Skip LLM call, record best-guess details
-            clause.clause_type = best_guess_type
-            clause.clause_type_detail = best_guess_detail
-            continue
-
-        if verbose:
-            log_verbose("[green]Gate Result: PASSED[/]")
+            return None, best_guess_type, best_guess_detail, 0.0, False
 
         # Invoke LLM Cascade
-        scanned_count += 1
         assessment = cascade_risk_assessment(
             clause_text=clause.clause_text,
             context_chunks=retrieved_chunks,
@@ -268,28 +268,10 @@ def scan_contract(
             precedent_chunks=precedent_chunks,
         )
 
-        if verbose:
-            log_verbose("[bold cyan]Raw LLM Risk Assessment JSON Output:[/]")
-            log_verbose(assessment.model_dump_json(indent=2))
-
-        # Update clause with LLM classification
-        clause.clause_type = assessment.clause_type
-        clause.clause_type_detail = assessment.clause_type_detail
-
-        # Grounding verification step
+        finding = None
+        grounded = False
         if assessment.risk_level != "none":
             grounded = verify_grounding(assessment, retrieved_chunks)
-            if verbose:
-                if grounded:
-                    log_verbose("[bold green]Grounding Verification: PASSED[/]")
-                else:
-                    log_verbose(
-                        f"[bold red]Grounding Verification: REJECTED[/]\n"
-                        f"  Cited Act: '{assessment.conflicting_act}' | Section: '{assessment.conflicting_section}'\n"
-                        f"  Cited Quote: \"{assessment.conflicting_law_quote}\"\n"
-                        f"  Reason: Cited details do not match any retrieved chunks."
-                    )
-            
             if grounded:
                 finding = RiskFinding(
                     clause_number=clause.clause_number,
@@ -305,14 +287,27 @@ def scan_contract(
                     confidence=assessment.confidence,
                     relevant_precedents=assessment.relevant_precedents or [],
                 )
-                findings.append(finding)
-                confidence_sum += assessment.confidence
-                llm_scanned_count += 1
-        else:
-            if verbose:
-                log_verbose("[dim green]Grounding Verification: skipped (no risk found by LLM)[/]")
-            confidence_sum += assessment.confidence
-            llm_scanned_count += 1
+
+        return finding, assessment.clause_type, assessment.clause_type_detail, assessment.confidence, True
+
+    # Run execution loop concurrently (supports up to 8 parallel requests to Groq/Gemini/Qdrant)
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        futures = [executor.submit(process_single_clause, i, c) for i, c in enumerate(clauses)]
+        for idx, future in enumerate(futures):
+            clause = clauses[idx]
+            try:
+                finding, c_type, c_detail, confidence, passed_gate = future.result()
+                clause.clause_type = c_type
+                clause.clause_type_detail = c_detail
+
+                if passed_gate:
+                    scanned_count += 1
+                    confidence_sum += confidence
+                    llm_scanned_count += 1
+                    if finding:
+                        findings.append(finding)
+            except Exception as thread_err:
+                print(f"[Error] Thread execution failure on clause #{clause.clause_number}: {thread_err}")
 
     # 5. Assemble scan summary status
     scan_confidence = confidence_sum / llm_scanned_count if llm_scanned_count > 0 else 1.0
