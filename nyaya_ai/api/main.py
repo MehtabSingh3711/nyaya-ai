@@ -168,6 +168,25 @@ def health_check(db: Session = Depends(get_db)):
         "database": db_status
     }
 
+def expand_legal_query(query: str) -> str:
+    """Enhance query with canonical Indian legal terminology for higher RAG retrieval recall."""
+    query_lower = query.lower()
+    expansions = []
+    if "non-compete" in query_lower or "non compete" in query_lower or "solicitation" in query_lower:
+        expansions.append("restraint of trade Section 27 Indian Contract Act 1872")
+    if "data" in query_lower or "privacy" in query_lower or "breach" in query_lower:
+        expansions.append("sensitive personal data Section 43A Information Technology Act 2000")
+    if "cheque" in query_lower or "bounce" in query_lower:
+        expansions.append("dishonour of cheque Section 138 Negotiable Instruments Act 1881")
+    if "msme" in query_lower or "45 days" in query_lower:
+        expansions.append("payment of dues Section 15 Section 16 MSME Development Act 2006")
+    if "penalty" in query_lower or "liquidated" in query_lower:
+        expansions.append("compensation for breach of contract Section 74 Indian Contract Act 1872")
+    
+    if expansions:
+        return f"{query} {' '.join(expansions)}"
+    return query
+
 class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = None
@@ -248,15 +267,18 @@ def chat_endpoint(
         embedder = request.app.state.embedder
         reranker = request.app.state.reranker
         
+        # Expand query with canonical Indian legal terminology for higher RAG recall
+        search_query = expand_legal_query(request_data.message)
+
         # Embed and Search
-        query_hybrid = embedder.embed_query_hybrid(request_data.message)
+        query_hybrid = embedder.embed_query_hybrid(search_query)
         candidates = search(
             query_vector=query_hybrid.dense,
             sparse_vector=query_hybrid.sparse,
             top_k=RERANK_CANDIDATES
         )
         
-        # Rerank
+        # Rerank against original message for accuracy
         if candidates:
             context_chunks = reranker.rerank(
                 query=request_data.message,
@@ -361,25 +383,16 @@ def scan_contract_endpoint(
     db.add(scan_record)
     db.commit()
 
-    # 4. Trigger Asynchronous Scan (Celery first, local thread fallback)
-    try:
-        run_contract_scan_task.delay(
-            scan_id=scan_id,
-            temp_file_path=temp_file_path,
-            original_filename=filename,
-            user_id=current_user.user_id,
-        )
-    except Exception as celery_err:
-        print(f"[Warning] Celery queue trigger failed: {celery_err}. Falling back to local background threads.")
-        background_tasks.add_task(
-            run_contract_scan_task_local,
-            scan_id=scan_id,
-            temp_file_path=temp_file_path,
-            original_filename=filename,
-            user_id=current_user.user_id,
-            embedder=request.app.state.embedder,
-            reranker=request.app.state.reranker,
-        )
+    # 4. Trigger Asynchronous Scan directly via FastAPI BackgroundTasks (Celery bypassed for simplicity & speed)
+    background_tasks.add_task(
+        run_contract_scan_task_local,
+        scan_id=scan_id,
+        temp_file_path=temp_file_path,
+        original_filename=filename,
+        user_id=current_user.user_id,
+        embedder=request.app.state.embedder,
+        reranker=request.app.state.reranker,
+    )
 
     return {
         "scan_id": scan_id,
@@ -449,6 +462,32 @@ def export_scan_report_endpoint(
         media_type="application/pdf",
         headers=headers
     )
+
+@app.delete("/api/v1/contracts/scan/{scan_id}")
+def delete_scan_endpoint(
+    scan_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    scan_record = db.query(ScanRecord).filter(
+        ScanRecord.scan_id == scan_id,
+        ScanRecord.user_id == current_user.user_id
+    ).first()
+    if not scan_record:
+        raise HTTPException(status_code=404, detail="Scan record not found.")
+
+    # 1. Delete record from SQLite database
+    db.delete(scan_record)
+    db.commit()
+
+    # 2. Delete contract vector embeddings from Qdrant Cloud
+    try:
+        from nyaya_ai.store.qdrant import delete_contract_vectors
+        delete_contract_vectors(contract_id=scan_id)
+    except Exception as qdrant_err:
+        print(f"[Warning] Failed to delete contract vectors from Qdrant: {qdrant_err}")
+
+    return {"status": "success", "message": f"Scan record {scan_id} and associated vector embeddings deleted successfully."}
 
 @app.get("/api/v1/contracts/scans")
 def list_scans_endpoint(

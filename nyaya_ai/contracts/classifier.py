@@ -82,6 +82,16 @@ KEYWORDS = {
         "venue",
         "courts of",
     ],
+    "penalty": [
+        "penalty",
+        "liquidated damages",
+        "penalty clause",
+        "forfeit",
+        "forfeiture",
+        "penal",
+        "pre-determined damages",
+        "predetermined damages",
+    ],
 }
 
 

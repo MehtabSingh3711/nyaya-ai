@@ -161,6 +161,26 @@ def upsert_chunks(
     console.print(f"[green]Upserted {len(points)} points into '{collection_name}'.[/]")
 
 
+def delete_contract_vectors(contract_id: str, collection_name: str = "nyaya_contracts") -> None:
+    """Delete all vector points associated with a specific contract ID from Qdrant."""
+    client = _get_client()
+    try:
+        client.delete(
+            collection_name=collection_name,
+            points_selector=qmodels.Filter(
+                must=[
+                    qmodels.FieldCondition(
+                        key="contract_id",
+                        match=qmodels.MatchValue(value=contract_id),
+                    )
+                ]
+            ),
+        )
+        console.print(f"[green]Purged vectors for contract '{contract_id}' from '{collection_name}'.[/]")
+    except Exception as e:
+        console.print(f"[warning]Could not purge vectors for contract '{contract_id}': {e}[/]")
+
+
 def search(
     query_vector: list[float],
     top_k: int = 5,

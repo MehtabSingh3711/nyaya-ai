@@ -150,3 +150,22 @@ class TestEmbedderHybrid:
         """Sparse vector should have at least some non-zero entries."""
         result = mock_embedder.embed_query_hybrid("test query")
         assert len(result.sparse) > 0
+
+    @patch("requests.post")
+    def test_remote_embedding_service(self, mock_post):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "dense": [0.1] * 1024,
+            "sparse": {"101": 0.5, "202": 0.8}
+        }
+        mock_resp.raise_for_status = MagicMock()
+        mock_post.return_value = mock_resp
+
+        embedder = Embedder.__new__(Embedder)
+        embedder._remote_url = "https://test-kaggle.trycloudflare.com"
+        embedder._model = None
+
+        res = embedder.embed_query_hybrid("sample query")
+        assert len(res.dense) == 1024
+        assert res.sparse == {101: 0.5, 202: 0.8}
+        mock_post.assert_called_once()

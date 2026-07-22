@@ -47,6 +47,7 @@ PRECEDENTS_COLLECTION_NAME = "nyaya_precedents"
 # ---------------------------------------------------------------------------
 EMBEDDING_MODEL = "BAAI/bge-m3"
 EMBEDDING_DIM = 1024
+REMOTE_EMBEDDING_URL = os.getenv("REMOTE_EMBEDDING_URL", None)
 
 # ---------------------------------------------------------------------------
 # Reranking — Cross-encoder (ADR-002)
@@ -68,7 +69,7 @@ JINA_API_KEY = os.getenv("JINA_API_KEY")
 # Tier 1 — Groq
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
-GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_MODEL = "llama-3.1-8b-instant"
 
 # Tier 2 — Gemini (via OpenAI-compatible endpoint)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -117,5 +118,5 @@ MIN_CHUNK_TOKENS = 50     # merge sections shorter than this
 # ---------------------------------------------------------------------------
 # Contract Intelligence (Mode 1)
 # ---------------------------------------------------------------------------
-CONTRACT_RELEVANCE_THRESHOLD = -0.80
+CONTRACT_RELEVANCE_THRESHOLD = -1.5
 CONTRACT_RISK_TOP_K = 15

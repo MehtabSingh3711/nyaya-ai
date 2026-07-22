@@ -189,6 +189,7 @@ class ClauseExtraction(BaseModel):
         "non_compete",
         "indemnity",
         "arbitration",
+        "penalty",
         "other",
     ] = Field(..., description="Primary category of the clause")
     clause_type_detail: Optional[str] = Field(
@@ -280,6 +281,7 @@ class RiskAssessment(BaseModel):
         "non_compete",
         "indemnity",
         "arbitration",
+        "penalty",
         "other",
     ] = Field(..., description="Refined category of the clause")
     clause_type_detail: Optional[str] = Field(

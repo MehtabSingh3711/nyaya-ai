@@ -18,67 +18,215 @@ from nyaya_ai.store import qdrant
 from nyaya_ai.retrieval.embedder import Embedder
 from nyaya_ai.retrieval.reranker import Reranker
 
+# Clause types that must always be sent to the LLM, regardless of rerank score
+HIGH_RISK_CATEGORIES = frozenset({
+    "non_compete", "payment_term", "indemnity", "liability", "penalty",
+})
+
+# ---------------------------------------------------------------------------
+# Statutory abbreviation → canonical token mapping
+# ---------------------------------------------------------------------------
+_ACT_ABBREVIATIONS: dict[str, str] = {
+    "ica": "indian contract act",
+    "ipc": "indian penal code",
+    "crpc": "code of criminal procedure",
+    "cpc": "code of civil procedure",
+    "it act": "information technology act",
+    "msmed": "micro small and medium enterprises development act",
+    "msme": "micro small and medium enterprises development act",
+    "nia": "negotiable instruments act",
+    "sarfaesi": "securitisation and reconstruction of financial assets and enforcement of security interest act",
+    "fema": "foreign exchange management act",
+    "sebi act": "securities and exchange board of india act",
+    "companies act": "companies act",
+}
+
+# Canonical tokens used for fuzzy Act matching — order matters (longer first)
+_CANONICAL_ACT_TOKENS: list[str] = [
+    "micro small and medium enterprises development",
+    "information technology",
+    "indian contract",
+    "contract act",
+    "indian penal code",
+    "negotiable instruments",
+    "foreign exchange management",
+    "companies act",
+    "copyright",
+    "arbitration and conciliation",
+    "arbitration",
+    "competition",
+    "consumer protection",
+    "trade marks",
+    "trademark",
+    "patents",
+    "specific relief",
+    "transfer of property",
+    "sale of goods",
+    "partnership",
+    "limited liability partnership",
+    "insolvency and bankruptcy",
+]
+
+
+def _expand_abbreviation(text: str) -> str:
+    """Expand known statutory abbreviations to canonical form."""
+    lowered = text.lower().strip()
+    for abbr, full in _ACT_ABBREVIATIONS.items():
+        if abbr in lowered:
+            return full
+    return lowered
+
+
+def _extract_act_tokens(act_name: str) -> set[str]:
+    """Extract canonical statutory tokens from an Act name for fuzzy matching.
+
+    Handles abbreviations (ICA, MSME, etc.), leading 'The', and year suffixes.
+    Returns a set of canonical token strings that matched.
+    """
+    if not act_name:
+        return set()
+
+    expanded = _expand_abbreviation(act_name)
+    # Strip leading "the "
+    if expanded.startswith("the "):
+        expanded = expanded[4:]
+    # Strip trailing year
+    expanded = re.sub(r"\b\d{4}\b", "", expanded).strip()
+    # Remove punctuation, collapse whitespace
+    expanded = re.sub(r"[^\w\s]", "", expanded)
+    expanded = " ".join(expanded.split())
+
+    matched: set[str] = set()
+    for token in _CANONICAL_ACT_TOKENS:
+        if token in expanded:
+            matched.add(token)
+    # If nothing matched, use the cleaned string itself as a token
+    if not matched and expanded:
+        matched.add(expanded)
+    return matched
+
+
+def _extract_section_digits(sec: str) -> str:
+    """Normalize a section reference to just digits and sub-clause letters.
+
+    Examples:
+        'Section 27'     → '27'
+        'Sec. 43A'       → '43a'
+        '19(1)(g)'       → '19'
+        'Section 15/16'  → '15'  (first section extracted)
+        'clause 7.2'     → '7'
+    """
+    if not sec:
+        return ""
+    sec = sec.lower().strip()
+    # Remove common prefixes
+    sec = re.sub(r"^(?:section|sec\.?|article|art\.?|clause|cl\.?)\s*", "", sec)
+    # Extract leading digits + optional sub-clause letter (e.g., 43A, 27, 15)
+    m = re.match(r"(\d+[a-z]?)", sec)
+    return m.group(1) if m else sec.strip()
+
 
 def normalize_text(text: str) -> str:
     """Normalize text for grounding matches."""
     if not text:
         return ""
     text = text.lower().strip()
-    # Remove leading "the "
     if text.startswith("the "):
         text = text[4:].strip()
-    # Remove punctuation
     text = re.sub(r"[^\w\s]", "", text)
-    # Collapse whitespace
     text = " ".join(text.split())
     return text
 
 
-def normalize_section(sec: str) -> str:
-    """Normalize section number for grounding matches."""
-    if not sec:
-        return ""
-    sec = sec.lower().strip()
-    # Remove common prefixes like 'section', 'sec', 'clause', 'cl', etc.
-    sec = re.sub(r"^(?:section|sec|article|art|cl|clause)\s*", "", sec)
-    # Remove surrounding punctuation
-    sec = re.sub(r"[^\w\s\(\)]", "", sec)
-    return sec.strip()
-
-
 def verify_grounding(assessment: RiskAssessment, retrieved_chunks: list[dict]) -> bool:
-    """Verify that the LLM risk assessment is grounded in the retrieved context.
+    """Verify that the LLM risk assessment is grounded in the retrieved statutory context.
 
-    Checks if the cited Act, Section, and Quote exist within the retrieved
-    statutory sections.
+    Uses three-stage matching:
+    1. Canonical Act token overlap + normalized section digit match
+    2. Normalized text substring match (backward-compatible)
+    3. Soft fallback: for high/medium risk with confidence > 0.75,
+       check if conflicting_law_quote appears in any chunk text
     """
     if not assessment.conflicting_act or not assessment.conflicting_section:
+        # Soft fallback for high/medium without act/section — quote-based
+        if (
+            assessment.risk_level in ("high", "medium")
+            and assessment.confidence > 0.75
+            and assessment.conflicting_law_quote
+        ):
+            quote_lower = assessment.conflicting_law_quote.lower().strip()
+            if len(quote_lower) > 20:  # non-trivial quote
+                for chunk in retrieved_chunks:
+                    chunk_text = (chunk.get("text", "") or "").lower()
+                    if quote_lower in chunk_text:
+                        return True
         return False
 
-    norm_act = normalize_text(assessment.conflicting_act)
-    norm_sec = normalize_section(assessment.conflicting_section)
-    norm_quote = normalize_text(assessment.conflicting_law_quote or "")
+    # --- Stage 1: Canonical token matching ---
+    llm_act_tokens = _extract_act_tokens(assessment.conflicting_act)
+    llm_sec = _extract_section_digits(assessment.conflicting_section)
 
-    # Loose Act name match by removing the year if present
+    for chunk in retrieved_chunks:
+        chunk_act_tokens = _extract_act_tokens(chunk.get("act_name", ""))
+        chunk_sec = _extract_section_digits(chunk.get("section_number", ""))
+
+        # Act matches if there is any overlap in canonical tokens
+        act_matches = bool(llm_act_tokens & chunk_act_tokens)
+
+        # Section matches if digits match
+        sec_matches = (
+            llm_sec and chunk_sec and (
+                llm_sec == chunk_sec
+                or llm_sec in chunk_sec
+                or chunk_sec in llm_sec
+            )
+        )
+
+        if act_matches and sec_matches:
+            return True
+
+    # --- Stage 2: Normalized text substring matching (backward-compatible) ---
+    norm_act = normalize_text(assessment.conflicting_act)
     norm_act_no_year = re.sub(r"\b\d{4}\b", "", norm_act).strip()
 
     for chunk in retrieved_chunks:
         chunk_act = normalize_text(chunk.get("act_name", ""))
         chunk_act_no_year = re.sub(r"\b\d{4}\b", "", chunk_act).strip()
-        chunk_sec = normalize_section(chunk.get("section_number", ""))
-        chunk_text = normalize_text(chunk.get("text", ""))
+        chunk_sec = _extract_section_digits(chunk.get("section_number", ""))
 
-        # Match Act
-        act_matches = (norm_act == chunk_act) or (norm_act_no_year == chunk_act_no_year)
-        # Match Section number
-        sec_matches = (norm_sec == chunk_sec)
-        # Match Quote (substring match)
-        quote_matches = True
-        if norm_quote:
-            quote_matches = (norm_quote in chunk_text) or (chunk_text in norm_quote)
+        act_matches = (
+            norm_act in chunk_act
+            or chunk_act in norm_act
+            or norm_act_no_year in chunk_act_no_year
+            or chunk_act_no_year in norm_act_no_year
+        )
+        sec_matches = llm_sec and chunk_sec and (
+            llm_sec == chunk_sec
+            or llm_sec in chunk_sec
+            or chunk_sec in llm_sec
+        )
 
-        if act_matches and sec_matches and quote_matches:
+        if act_matches and sec_matches:
             return True
+
+    # --- Stage 3: Soft fallback for high/medium confidence findings ---
+    # Requires act token overlap plus quote presence in chunk text.
+    # Section-only is insufficient because many Acts share section numbers
+    # (e.g., "43A" exists in both IT Act and Companies Act).
+    if (
+        assessment.risk_level in ("high", "medium")
+        and assessment.confidence > 0.75
+        and assessment.conflicting_law_quote
+    ):
+        quote_lower = assessment.conflicting_law_quote.lower().strip()
+        if len(quote_lower) > 20:
+            for chunk in retrieved_chunks:
+                chunk_act_tokens = _extract_act_tokens(chunk.get("act_name", ""))
+                chunk_text = (chunk.get("text", "") or "").lower()
+
+                # Act must match — section numbers are not unique across Acts
+                if bool(llm_act_tokens & chunk_act_tokens) and quote_lower in chunk_text:
+                    return True
 
     return False
 
@@ -171,7 +319,9 @@ def scan_contract_stream(
 
         max_score = max([c["rerank_score"] for c in retrieved_chunks]) if retrieved_chunks else 0.0
 
-        if max_score < relevance_threshold:
+        # High-risk clause types always get LLM assessment, regardless of rerank score
+        is_high_risk_type = best_guess_type in HIGH_RISK_CATEGORIES
+        if max_score < relevance_threshold and not is_high_risk_type:
             return None, best_guess_type, best_guess_detail, 0.0, False
 
         # Invoke LLM Cascade

@@ -27,19 +27,17 @@ console = Console()
 
 
 class Reranker:
-    """Cross-encoder reranker using Jina Reranker Cloud API (or local ONNX fallback).
-
-    If JINA_API_KEY is present in config, reranking is executed on Jina's cloud endpoints
-    for high speed and zero local memory consumption. If absent or offline, falls back
-    to running the local cross-encoder model via ONNX.
-    """
+    """Cross-encoder reranker using Kaggle Remote GPU microservice or local ONNX fallback."""
 
     def __init__(self) -> None:
+        from nyaya_ai.config import REMOTE_EMBEDDING_URL
+        self._remote_url = REMOTE_EMBEDDING_URL.rstrip('/') if REMOTE_EMBEDDING_URL else None
         self._model = None
-        if JINA_API_KEY:
-            console.print("[green]Jina Reranker Cloud API initialized (Online Mode).[/]")
+
+        if self._remote_url:
+            console.print(f"[bold green]Using Remote GPU Reranker Microservice: {self._remote_url}[/]")
         else:
-            console.print("[yellow]JINA_API_KEY not configured. Running local ONNX Reranker.[/]")
+            console.print("[yellow]REMOTE_EMBEDDING_URL not set. Running local ONNX Reranker.[/]")
 
     def _score_locally(self, query: str, prefixed_texts: list[str]) -> list[float]:
         """Lazy-loads and executes local ONNX cross-encoder scoring."""
@@ -61,22 +59,10 @@ class Reranker:
         top_k: int = 5,
         text_key: str = "text",
     ) -> list[dict]:
-        """Rerank candidates using Jina Cloud Reranker or local fallback.
+        """Rerank candidates using Kaggle GPU Microservice or local ONNX fallback.
 
         Each candidate dict must contain a text field (default key: "text")
         that will be paired with the query for cross-encoder scoring.
-
-        Args:
-            query: The search query string.
-            candidates: List of candidate dicts from hybrid search.
-                        Each must have a ``text_key`` field.
-            top_k: Number of top results to return after reranking.
-            text_key: Key in candidate dicts containing the text to score.
-
-        Returns:
-            Top-k candidates sorted by cross-encoder score (descending).
-            Each dict gets an added ``rerank_score`` field and retains
-            the original ``score`` field from retrieval.
         """
         if not candidates:
             return []
@@ -91,46 +77,23 @@ class Reranker:
             prefixed_texts.append(f"{prefix}{cand_text}")
 
         scores = []
-        if JINA_API_KEY:
+        if self._remote_url:
             try:
                 import requests
-                import time
-                import random
-                url = "https://api.jina.ai/v1/rerank"
-                headers = {
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {JINA_API_KEY}"
-                }
+                url = f"{self._remote_url}/rerank"
                 payload = {
-                    "model": "jina-reranker-v1-turbo-en",
                     "query": query,
                     "documents": prefixed_texts,
                     "top_n": len(prefixed_texts)
                 }
-                
-                response = None
-                for attempt in range(4):
-                    try:
-                        response = requests.post(url, json=payload, headers=headers, timeout=5.0)
-                        if response.status_code == 429:
-                            # 429 rate limit hit, sleep with jitter and retry
-                            sleep_dur = 1.0 + attempt * 1.0 + random.random()
-                            time.sleep(sleep_dur)
-                            continue
-                        response.raise_for_status()
-                        break
-                    except (requests.RequestException, Exception) as req_err:
-                        if attempt == 3:
-                            raise req_err
-                        time.sleep(1.0 + random.random())
-                
-                # Jina API returns results list ordered by relevance
-                results = response.json().get("results", [])
+                resp = requests.post(url, json=payload, timeout=30.0)
+                resp.raise_for_status()
+                results = resp.json().get("results", [])
                 scores = [0.0] * len(prefixed_texts)
                 for item in results:
                     scores[item["index"]] = float(item["relevance_score"])
-            except Exception as e:
-                console.print(f"[red][Warning] Jina API Reranking failed: {e}. Falling back to local ONNX.[/]")
+            except Exception as remote_err:
+                console.print(f"[red][Warning] Remote GPU Rerank failed: {remote_err}. Falling back to local ONNX.[/]")
                 scores = self._score_locally(query, prefixed_texts)
         else:
             scores = self._score_locally(query, prefixed_texts)

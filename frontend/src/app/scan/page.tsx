@@ -4,6 +4,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Header from '@/components/Header';
 import { api } from '@/lib/api';
+import ConfirmModal from '@/components/ConfirmModal';
+import Toast, { ToastMessage } from '@/components/Toast';
 import {
   UploadCloud,
   FileText,
@@ -19,7 +21,8 @@ import {
   ArrowLeft,
   Clock,
   ExternalLink,
-  BookOpen
+  BookOpen,
+  Trash2
 } from 'lucide-react';
 
 interface Precedent {
@@ -221,6 +224,19 @@ export default function ContractScannerPage() {
     }
   };
 
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+
+  const handleDeleteCurrentScan = async () => {
+    if (!scanRecord) return;
+    try {
+      await api.delete(`/api/v1/contracts/scan/${scanRecord.scan_id}`);
+      router.push('/dashboard');
+    } catch (err) {
+      setToast({ id: Date.now().toString(), type: 'error', message: 'Failed to delete contract scan.' });
+    }
+  };
+
   // Filtering findings
   const getFilteredFindings = () => {
     if (!scanRecord || !scanRecord.results) return [];
@@ -385,6 +401,15 @@ export default function ContractScannerPage() {
               <span>Export Report</span>
             </button>
           )}
+
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            className="p-1.5 border border-red-500/20 text-red-400 hover:bg-red-500/10 rounded transition-colors flex items-center gap-1.5 text-xs"
+            title="Delete Contract & Vectors"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Delete</span>
+          </button>
         </div>
       </div>
 
@@ -635,6 +660,20 @@ export default function ContractScannerPage() {
         </aside>
 
       </div>
+
+      {/* Confirm Delete Modal */}
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        title="Delete Contract Scan?"
+        description="This will remove the contract scan from your database and purge all associated vector embeddings from Qdrant Cloud."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        onConfirm={handleDeleteCurrentScan}
+        onClose={() => setShowDeleteModal(false)}
+      />
+      {/* Toast Notification */}
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }

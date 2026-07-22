@@ -53,7 +53,12 @@ def test_verify_grounding_act_mismatch():
     assert verify_grounding(assessment, retrieved) is False
 
 
-def test_verify_grounding_quote_mismatch():
+def test_verify_grounding_quote_mismatch_but_act_section_grounded():
+    """Act and section ARE in retrieved context — grounding passes even if quote is bad.
+    
+    Quote accuracy is a quality issue, not a grounding failure.
+    The LLM correctly identified ICA §27 from the retrieved context.
+    """
     retrieved = [
         {
             "act_name": "Indian Contract Act 1872",
@@ -61,13 +66,36 @@ def test_verify_grounding_quote_mismatch():
             "text": "Every agreement in restraint of trade is void.",
         }
     ]
-    # LLM quotes a law that is not in the text
+    # LLM quotes a fabricated law text but correct Act+Section
     assessment = RiskAssessment(
         risk_level="high",
         conflicting_act="Indian Contract Act 1872",
         conflicting_section="27",
         conflicting_law_quote="all non-competes are criminal offences in India",
         explanation="Quote not grounded.",
+        recommended_action="Remove.",
+        confidence=0.9,
+        clause_type="non_compete",
+    )
+    # Act+Section are grounded — passes
+    assert verify_grounding(assessment, retrieved) is True
+
+
+def test_verify_grounding_hallucinated_act_and_section():
+    """Neither the Act nor section appear in retrieved context — truly ungrounded."""
+    retrieved = [
+        {
+            "act_name": "Indian Contract Act 1872",
+            "section_number": "27",
+            "text": "Every agreement in restraint of trade is void.",
+        }
+    ]
+    assessment = RiskAssessment(
+        risk_level="high",
+        conflicting_act="Prevention of Corruption Act 1988",
+        conflicting_section="13",
+        conflicting_law_quote="criminal misconduct by a public servant",
+        explanation="Completely hallucinated.",
         recommended_action="Remove.",
         confidence=0.9,
         clause_type="non_compete",

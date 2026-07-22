@@ -115,7 +115,7 @@ _RISK_ASSESSMENT_SCHEMA = """\
   "explanation": "string — detailed explanation of the conflict/risk and legal reasoning, grounded ONLY in the retrieved context",
   "recommended_action": "string or null — actionable advice or negotiation stance for the user, else null",
   "confidence": "float — your confidence in this assessment, 0.0 to 1.0",
-  "clause_type": "string — 'payment_term', 'termination', 'liability', 'IP', 'non_compete', 'indemnity', 'arbitration', or 'other'",
+  "clause_type": "string — 'payment_term', 'termination', 'liability', 'IP', 'non_compete', 'indemnity', 'arbitration', 'penalty', or 'other'",
   "clause_type_detail": "string or null — refined sub-type or detail (e.g. 'non-compete period', 'payment due date')",
   "relevant_precedents": [
     {
@@ -147,9 +147,37 @@ If you identify a statutory risk or conflict (i.e. `risk_level` is NOT `none`):
 3. For each matching precedent, extract and populate its exact `case_name`, `citation`, and `core_holding`. Do not invent or hallucinate cases not present in the provided precedents context.
 4. If no precedents in the context are relevant, leave `relevant_precedents` as an empty list `[]`.
 
-## Strict Legal Assessment Guidelines
+## Risk Level Classification — FOLLOW THESE EXACT CRITERIA
 
-To ensure accurate and grounded compliance assessments, you MUST follow these legal logic rules:
+### HIGH RISK — Direct statutory prohibitions or void agreements
+Assign `risk_level: "high"` when the clause is directly void, prohibited, or unenforceable under Indian law:
+- **Post-employment non-compete / non-solicit clauses** → void under Section 27 of the Indian Contract Act, 1872 (restraint of trade). ANY clause restricting an individual from practicing a profession, trade, or business after termination of employment or contract is void under Section 27.
+- **Unconscionable liquidated damages / penalty clauses** → reviewable under Section 74 of the Indian Contract Act, 1872. If a clause imposes a fixed penalty or liquidated damages amount that appears disproportionate or excessive, it conflicts with Section 74 which limits recovery to "reasonable compensation".
+- **Restraint of legal proceedings** → void under Section 28 of the Indian Contract Act, 1872. Clauses that absolutely bar a party from enforcing their rights through legal proceedings.
+
+### MEDIUM RISK — Statutory compliance violations
+Assign `risk_level: "medium"` for clauses that violate specific regulatory requirements:
+- **Payment credit periods exceeding 45 days** → violates Section 15/16 of the Micro, Small and Medium Enterprises Development Act, 2006. If a payment term specifies 60, 90, or any period beyond 45 days, flag it.
+- **IP assignment without explicit territory or term** → potentially non-compliant with Section 19 of the Copyright Act, 1957 which requires assignment to specify territory, duration, and scope.
+- **Unilateral arbitrary termination without cure period** → one-sided termination convenience clauses that give no opportunity to remedy a breach before termination.
+
+### LOW RISK — One-sided, onerous, or ambiguous terms
+Assign `risk_level: "low"` for terms that are legally valid but commercially one-sided:
+- Uncapped or unlimited indemnity obligations
+- Broad liability waivers for consequential / indirect damages
+- Automatic renewal without adequate notice provisions
+- Overly broad confidentiality obligations with no time limit
+
+### NO RISK — Standard compliant clauses
+Assign `risk_level: "none"` ONLY when:
+- The clause is a standard, compliant provision (mutual confidentiality, governing law, entire agreement, reasonable mutual termination notice).
+- The retrieved statutory context does NOT conflict with or void the clause.
+- The retrieved statute is from a completely different domain or applies to different entities (e.g., a statute regulating public servants applied to a private company employee).
+
+## CRITICAL INSTRUCTION — Do NOT default to "none"
+When a contract clause imposes a post-employment restriction, excessive penalty, payment delay beyond 45 days, or unilateral waiver, evaluate the retrieved statutory sections carefully and declare the appropriate high/medium risk level. Do NOT default to "none" simply because the wording differs between the contract clause and the statute — compare the LEGAL SUBSTANCE and intent, not verbatim wording.
+
+## Strict Legal Assessment Guidelines
 
 1. **Boilerplate & Standard Clauses are Legally Valid**: 
    - Standard, compliant clauses (such as standard confidentiality obligations, choice of governing law/courts, entire agreement, or reasonable mutual termination notice) do not conflict with statutory law. They must be assessed as `risk_level: "none"`.
@@ -157,22 +185,19 @@ To ensure accurate and grounded compliance assessments, you MUST follow these le
    - Check if the retrieved statute actually applies to the entities and context in the contract.
    - For example, a statute regulating public servants (e.g. Prevention of Corruption Act) is completely inapplicable to a private company employee.
    - A statute regulating hire-purchase agreements (e.g. Hire Purchase Act) is completely inapplicable to employment contracts.
-   - A statute regulating private school teachers (e.g. Delhi School Education Act) is completely inapplicable to a software engineer at a private company.
    - If the retrieved context is from a different domain or applies to different roles/entities, you MUST assess `risk_level: "none"`.
 3. **No Forced or Stretched Connections**:
    - Do not stretch the meaning of a statute to find a "plausible-sounding" conflict based on shared vocabulary.
    - A conflict only exists if the retrieved statutory provision specifically and directly prohibits, voids, or restricts the exact obligation set forth in the contract clause.
-4. **Targeted Risk Identification**:
-   - Set `risk_level: "high"` only for clauses that are directly void or illegal (e.g., post-employment non-compete covenants under Section 27 of the Indian Contract Act, 1872).
-   - Set `risk_level: "medium"` or `"low"` for compliance violations (e.g., payment terms > 45 days violating the MSME Development Act, 2006) or significant regulatory exposures.
-   - If no retrieved statute directly and specifically voids or contradicts the clause, you MUST set `risk_level: "none"` and leave conflicting fields as null.
+4. **Apply the Risk Classification above accurately**:
+   - Use the HIGH / MEDIUM / LOW / NONE criteria defined above. Do not invent your own thresholds.
 
 ## CRITICAL: STRICT GROUNDING RULES — follow these without exception
 
 1. **Ground your analysis strictly and exclusively in the retrieved context.** You may ONLY declare a risk and cite a conflict if the conflicting law text is present in the retrieved context sections below.
 2. **DO NOT assume or extrapolate figures or caps.** If a contract clause sets a term (e.g. "payment in 60 days") and the retrieved statute doesn't specify a day limit (e.g. "within the agreed period" instead of "within 45 days"), you cannot declare a conflict unless the statutory limit is written verbatim in the context.
 3. **Set risk_level to 'none' if no conflict exists.** If the retrieved statutory provisions do not conflict with or void the clause, you must set "risk_level" to "none" and explain that no conflict was found with the retrieved context. Set "conflicting_act", "conflicting_section", "conflicting_law_quote", and "recommended_action" to null in this case.
-4. **Refine the Clause Type.** You are provided a local best-guess clause type. Review the clause text and either confirm or improve it. It MUST be one of: 'payment_term', 'termination', 'liability', 'IP', 'non_compete', 'indemnity', 'arbitration', or 'other'. Provide a refined detail in "clause_type_detail" if applicable.
+4. **Refine the Clause Type.** You are provided a local best-guess clause type. Review the clause text and either confirm or improve it. It MUST be one of: 'payment_term', 'termination', 'liability', 'IP', 'non_compete', 'indemnity', 'arbitration', 'penalty', or 'other'. Provide a refined detail in "clause_type_detail" if applicable.
 5. **Verbatim quote for citations.** The "conflicting_law_quote" must contain a verbatim quote from the retrieved statutory context that demonstrates the conflict. Copy it exactly — do not paraphrase or summarize.
 6. **Output valid JSON only.** Your response must be a single JSON object matching this exact schema:
 

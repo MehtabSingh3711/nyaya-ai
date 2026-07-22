@@ -52,25 +52,28 @@ class Embedder:
     """
 
     def __init__(self, use_fp16: bool = True) -> None:
-        # pyrefly: ignore [missing-import]
-        from FlagEmbedding import BGEM3FlagModel
+        from nyaya_ai.config import REMOTE_EMBEDDING_URL, EMBEDDING_MODEL
+        self._remote_url = REMOTE_EMBEDDING_URL.rstrip('/') if REMOTE_EMBEDDING_URL else None
+        self._model = None
 
-        console.print(
-            f"[bold blue]Loading embedding model: {EMBEDDING_MODEL}...[/]\n"
-            f"  (First run downloads ~2.3 GB — cached for future runs)"
-        )
-        self._model = BGEM3FlagModel(EMBEDDING_MODEL, use_fp16=use_fp16)
-        console.print(f"[green]  Model loaded (dense + sparse support).[/]")
+        if self._remote_url:
+            console.print(f"[bold green]Using Remote GPU Embedding Service: {self._remote_url}[/]")
+        else:
+            from FlagEmbedding import BGEM3FlagModel
+            console.print(
+                f"[bold blue]Loading embedding model: {EMBEDDING_MODEL}...[/]\n"
+                f"  (First run downloads ~2.3 GB — cached for future runs)"
+            )
+            self._model = BGEM3FlagModel(EMBEDDING_MODEL, use_fp16=use_fp16)
+            console.print(f"[green]  Model loaded (dense + sparse support).[/]")
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
-        """Batch embed document texts — dense vectors only (backward compatible).
+        if self._remote_url:
+            import requests
+            resp = requests.post(f"{self._remote_url}/embed_documents_hybrid", json={"texts": texts})
+            resp.raise_for_status()
+            return resp.json()["dense"]
 
-        Args:
-            texts: List of text strings to embed.
-
-        Returns:
-            List of 1024-dimensional normalized embedding vectors.
-        """
         output = self._model.encode(
             texts,
             batch_size=32,
@@ -82,14 +85,12 @@ class Embedder:
         return output["dense_vecs"].tolist()
 
     def embed_query(self, text: str) -> list[float]:
-        """Embed a single query text — dense vector only (backward compatible).
+        if self._remote_url:
+            import requests
+            resp = requests.post(f"{self._remote_url}/embed_query_hybrid", json={"text": text})
+            resp.raise_for_status()
+            return resp.json()["dense"]
 
-        Args:
-            text: The query string.
-
-        Returns:
-            A 1024-dimensional normalized embedding vector.
-        """
         output = self._model.encode(
             [text],
             batch_size=1,
@@ -101,19 +102,15 @@ class Embedder:
         return output["dense_vecs"][0].tolist()
 
     def embed_documents_hybrid(self, texts: list[str], batch_size: int = 32) -> HybridVectors:
-        """Batch embed documents — both dense AND sparse vectors.
+        if self._remote_url:
+            import requests
+            resp = requests.post(f"{self._remote_url}/embed_documents_hybrid", json={"texts": texts, "batch_size": batch_size})
+            resp.raise_for_status()
+            data = resp.json()
+            # Convert sparse dictionary keys back to ints
+            sparse_converted = [{int(k): float(v) for k, v in d.items()} for d in data["sparse"]]
+            return HybridVectors(dense=data["dense"], sparse=sparse_converted)
 
-        One forward pass produces both vector types. This is the method
-        used during ingestion to populate Qdrant with hybrid named vectors.
-
-        Args:
-            texts: List of text strings to embed.
-            batch_size: Batch size for encoding.
-
-        Returns:
-            HybridVectors with .dense (list of 1024-dim vectors) and
-            .sparse (list of {token_id: weight} dicts).
-        """
         output = self._model.encode(
             texts,
             batch_size=batch_size,
@@ -128,8 +125,6 @@ class Embedder:
         # Convert lexical_weights to {int_token_id: float_weight} dicts
         sparse_vecs = []
         for weights_dict in output["lexical_weights"]:
-            # BGE-M3 returns {token_str_or_id: weight}
-            # Convert keys to int token IDs if they're strings
             converted = {}
             for key, value in weights_dict.items():
                 if isinstance(key, str):
@@ -142,17 +137,17 @@ class Embedder:
         return HybridVectors(dense=dense_vecs, sparse=sparse_vecs)
 
     def embed_query_hybrid(self, text: str) -> HybridQueryVectors:
-        """Embed a single query — both dense AND sparse vectors.
+        if self._remote_url:
+            import requests
+            resp = requests.post(f"{self._remote_url}/embed_query_hybrid", json={"text": text}, timeout=30.0)
+            resp.raise_for_status()
+            data = resp.json()
+            sparse_converted = {int(k): float(v) for k, v in data["sparse"].items()}
+            return HybridQueryVectors(
+                dense=data["dense"],
+                sparse=sparse_converted,
+            )
 
-        Used at search time to produce both vector types for hybrid retrieval.
-
-        Args:
-            text: The query string.
-
-        Returns:
-            HybridQueryVectors with .dense (1024-dim vector) and
-            .sparse ({token_id: weight} dict).
-        """
         result = self.embed_documents_hybrid([text], batch_size=1)
         return HybridQueryVectors(
             dense=result.dense[0],

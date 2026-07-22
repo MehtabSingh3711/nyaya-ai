@@ -164,3 +164,32 @@ class TestReranker:
         assert "ICA 1872" in prefixed_docs[0]
         assert "Section 27" in prefixed_docs[0]
         assert "some clause text" in prefixed_docs[0]
+
+    @patch("requests.post")
+    def test_remote_gpu_reranker(self, mock_post):
+        """When REMOTE_EMBEDDING_URL is configured, rerank calls remote Kaggle endpoint."""
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "results": [
+                {"index": 0, "relevance_score": 0.95},
+                {"index": 1, "relevance_score": 0.72}
+            ]
+        }
+        mock_resp.raise_for_status = MagicMock()
+        mock_post.return_value = mock_resp
+
+        from nyaya_ai.retrieval.reranker import Reranker
+        reranker = Reranker.__new__(Reranker)
+        reranker._remote_url = "https://test-kaggle.trycloudflare.com"
+        reranker._model = None
+
+        candidates = [
+            {"text": "clause 1", "score": 0.5},
+            {"text": "clause 2", "score": 0.4}
+        ]
+
+        res = reranker.rerank(query="test", candidates=candidates, top_k=2)
+        assert len(res) == 2
+        assert res[0]["rerank_score"] == 0.95
+        assert res[1]["rerank_score"] == 0.72
+        mock_post.assert_called_once()

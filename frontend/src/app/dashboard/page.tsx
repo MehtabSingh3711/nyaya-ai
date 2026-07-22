@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
+import ConfirmModal from '@/components/ConfirmModal';
+import Toast, { ToastMessage } from '@/components/Toast';
 import { api } from '@/lib/api';
 import {
   FileText,
@@ -103,20 +105,41 @@ export default function DashboardPage() {
     }
   };
 
-  const handleDeleteChat = async (sessionId: string, e: React.MouseEvent) => {
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: 'scan' | 'chat' } | null>(null);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+
+  const handleDeleteChat = (sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm('Are you sure you want to delete this chat session?')) return;
-    
-    try {
-      await api.delete(`/api/v1/chat/sessions/${sessionId}`);
-      // Refresh chats list
-      setChats(prev => prev.filter(c => c.session_id !== sessionId));
-      // Reload stats to update chat count
-      const statsRes = await api.get('/api/v1/dashboard/stats');
-      setStats(statsRes.data);
-    } catch (err) {
-      alert('Failed to delete chat session.');
+    setDeleteTarget({ id: sessionId, type: 'chat' });
+  };
+
+  const handleDeleteScan = (scanId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeleteTarget({ id: scanId, type: 'scan' });
+  };
+
+  const handleExecuteDelete = async () => {
+    if (!deleteTarget) return;
+    if (deleteTarget.type === 'scan') {
+      try {
+        await api.delete(`/api/v1/contracts/scan/${deleteTarget.id}`);
+        setScans((prev) => prev.filter((s) => s.scan_id !== deleteTarget.id));
+        setToast({ id: Date.now().toString(), type: 'success', message: 'Contract scan and vector embeddings deleted successfully.' });
+        fetchDashboardData();
+      } catch (err) {
+        setToast({ id: Date.now().toString(), type: 'error', message: 'Failed to delete contract scan.' });
+      }
+    } else if (deleteTarget.type === 'chat') {
+      try {
+        await api.delete(`/api/v1/chat/sessions/${deleteTarget.id}`);
+        setChats((prev) => prev.filter((c) => c.session_id !== deleteTarget.id));
+        setToast({ id: Date.now().toString(), type: 'success', message: 'Chat session deleted successfully.' });
+        fetchDashboardData();
+      } catch (err) {
+        setToast({ id: Date.now().toString(), type: 'error', message: 'Failed to delete chat session.' });
+      }
     }
+    setDeleteTarget(null);
   };
 
   const formatDate = (dateString: string) => {
@@ -343,11 +366,11 @@ export default function DashboardPage() {
                                 </button>
                               )}
                               <button
-                                onClick={() => router.push(`/scan?id=${s.scan_id}`)}
-                                className="text-muted hover:text-primary"
-                                title="View details"
+                                onClick={(e) => handleDeleteScan(s.scan_id, e)}
+                                className="text-muted hover:text-[var(--garnet)] transition-colors p-1"
+                                title="Delete Scan"
                               >
-                                <ExternalLink className="w-4 h-4" />
+                                <Trash2 className="w-4 h-4" />
                               </button>
                             </div>
                           </td>
@@ -424,6 +447,23 @@ export default function DashboardPage() {
         <Plus className="w-5 h-5" />
         <span>Upload New Contract</span>
       </button>
+      {/* Confirm Delete Modal */}
+      <ConfirmModal
+        isOpen={deleteTarget !== null}
+        title={deleteTarget?.type === 'scan' ? 'Delete Contract Scan?' : 'Delete Chat Session?'}
+        description={
+          deleteTarget?.type === 'scan'
+            ? 'This will remove the contract scan from your database and purge its vector embeddings from Qdrant Cloud.'
+            : 'This will permanently remove the chat session and its message history.'
+        }
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        onConfirm={handleExecuteDelete}
+        onClose={() => setDeleteTarget(null)}
+      />
+      {/* Toast Notification */}
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }
