@@ -329,7 +329,7 @@ def chat_endpoint(
 
 import os
 from nyaya_ai.api.database import ScanRecord
-from nyaya_ai.api.tasks import run_contract_scan_task, run_contract_scan_task_local
+from nyaya_ai.api.tasks import run_contract_scan_task_local
 
 TEMP_DIR = "temp_uploads"
 

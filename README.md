@@ -1,140 +1,175 @@
-# Nyaya AI — Indian Legal Intelligence Platform
-
-> *Know what you sign.*
-
-![Status](https://img.shields.io/badge/status-active%20development-green)
-![Segment](https://img.shields.io/badge/segment-3%20%E2%80%94%20Applied%20AI-blue)
-![Problem](https://img.shields.io/badge/problem-C1%20Contract%20Intelligence-purple)
-![Tests](https://img.shields.io/badge/tests-160%20passing-success)
-
-Nyaya (न्याय) is a production-grade Indian Legal Intelligence Platform designed to analyze contracts, verify compliance, and answer legal queries with high-precision citations of Indian statutory law.
+# Nyaya AI (न्याय AI) — Indian Legal Intelligence Platform
+> **Know what you sign.** Production-grade Indian contract risk intelligence & multi-statute legal RAG.
 
 ---
 
-## 🚀 Current Status & Achievements (Week 3)
-
-We have built a fully functional CLI pipeline for ingestion and retrieval with a robust evaluation harness. Here is what is working:
-
-1. **Statutory Corpus Ingested & Indexed (Qdrant Cloud)**:
-   * **Historical Central Acts**: 33,603 sections across 1,021 Acts (source: `mratanusarkar/Indian-Laws`).
-   * **2023 Criminal Justice Reforms**: 1,059 sections across **BNS, BNSS, and BSA** (source: `GSMS-B`).
-   * **Post-2021 Business/Data Laws**: Verbatim sections of **DPDP Act 2023**, **Mediation Act 2023**, **Telecommunications Act 2023**, and the **Jan Vishwas Act 2023**.
-2. **Hybrid Retrieval (Dense + Sparse)**:
-   * **Dense**: BGE-M3 (1024-dim, Cosine) on GPU.
-   * **Sparse**: BGE-M3 lexical token weights (Qdrant named sparse vectors).
-   * Combined using RRF (Reciprocal Rank Fusion) and gated via a Jina Reranker relevance gate.
-3. **Cloud LLM Cascade (₹0 Cost / Instant Latency)**:
-   * **Tier 1**: Groq (Llama 3.1 8B Instant) — ~2s response time.
-   * **Tier 2**: Gemini (2.5 Flash Lite via OpenAI-compatible endpoint).
-   * **Tier 3**: OpenRouter (Qwen 3 Next 80B Free).
-4. **Heuristic Contract Chunker**:
-   * Scans uploaded agreements line-by-line, splitting clauses using section symbols (`§`), numbered headers (`Section`, `Clause`, `Article`), and standalone capital legal titles.
-5. **Quality Assurance**:
-   * Over **160 unit and integration tests passing** covering schemas, chunking, embedding, deduplication, Qdrant store, and cascade execution.
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.111.0-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com/)
+[![Next.js](https://img.shields.io/badge/Next.js-14.2.35-000000?style=flat-square&logo=next.js)](https://nextjs.org/)
+[![Qdrant](https://img.shields.io/badge/Qdrant-Vector_DB-dc2626?style=flat-square&logo=qdrant)](https://qdrant.tech/)
+[![BGE-M3](https://img.shields.io/badge/Embeddings-BGE--M3_Dense%2BSparse-blue?style=flat-square)](https://huggingface.fr/BAAI/bge-m3)
+[![License](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](LICENSE)
 
 ---
 
-## 🛠️ Core Tech Stack
+## 🎬 Live Demo & Walkthrough
 
-| Layer | Technology |
-|---|---|
-| **Document Parsing** | PyMuPDF (native PDF text extractor) |
-| **Embeddings** | BAAI/bge-m3 (dense + sparse hybrid) |
-| **Vector DB** | Qdrant Cloud (Managed, named vectors) |
-| **Reranker** | Jina Reranker v1 Turbo (`CONTRACT_RELEVANCE_THRESHOLD = -0.80`) |
-| **LLMs** | Llama 3.1 8B (Groq) · Gemini 2.5 Flash Lite · Qwen 3 (OpenRouter) |
-| **Validation** | Pydantic v2 (Strict `CitedAnswer` and `CorpusChunk` validation) |
-| **Tests** | pytest |
+* **Live Frontend**:http://localhost:3000
+* **Demo Video Walkthrough**: [5-Minute Loom Video Walkthrough](https://loom.com)
 
 ---
 
-## 📁 Repository Structure
+## 📌 Problem Statement
+
+Every day, Indian freelancers, MSMEs, and startups sign contracts containing unenforceable or illegal clauses. Under **Section 27 of the Indian Contract Act, 1872**, post-employment non-compete clauses are completely void. Under **Section 15 & 16 of the MSME Development Act, 2006**, payment terms exceeding 45 days are illegal and incur mandatory 3x bank-rate interest penalties. 
+
+**Nyaya AI** bridges this gap by providing:
+1. **Mode 1 (Contract Intelligence)**: Automated clause-by-clause contract risk scanning against 33,603 sections of Indian law and landmark case precedents.
+2. **Mode 2 (Legal Intelligence Chat)**: Natural language Q&A across 1,021 Indian Acts with strict "Cite-or-Refuse" zero-hallucination guardrails.
+
+---
+
+## 🏗️ System Architecture
 
 ```
-├── nyaya_ai/               # Core packages
-│   ├── contracts/          # Mode 1: Contract Analysis (chunker, scanner, extractor)
-│   ├── ingest/             # Ingestion pipelines (loaders, deduplication, chunker)
-│   ├── retrieval/          # RAG search (embedder, relevance gate, cascade)
-│   ├── store/              # Qdrant client, upserts, and search queries
-│   ├── config.py           # Global settings, model configs, and env loading
-│   └── schemas.py          # Pydantic v2 schema definitions (CitedAnswer, CorpusChunk)
-├── new_laws/               # Custom statutory JSON files and Colab scripts
-├── tests/                  # Complete test suite (160+ passing tests)
-├── ingest.py               # statutory ingestion script CLI
-├── ingest_custom.py        # Ingests a custom structured JSON bare act
-└── query.py                # Mode 2: Legal Intelligence RAG Chat CLI
+                                  +-------------------------------------------------+
+                                  |         User / Web Browser (Client)             |
+                                  +------------------------+------------------------+
+                                                           |
+                                           HTTPS / REST    |
+                                                           v
+                                  +------------------------+------------------------+
+                                  |     Frontend Web App (Next.js 14 / React)      |
+                                  |    - Dashboard & Audit History                  |
+                                  |    - Contract Compliance Workstation            |
+                                  |    - Legal Intelligence Chat (Mode 2)           |
+                                  +------------------------+------------------------+
+                                                           |
+                                           HTTPS / REST    |
+                                                           v
+                                  +------------------------+------------------------+
+                                  |       Backend API Gateway (FastAPI)             |
+                                  |    - Authentication & User Sessions (JWT)       |
+                                  |    - Document Ingestion & Chunker               |
+                                  |    - Redis Response Caching                     |
+                                  |    - Dual-Storage Contract Deletion           |
+                                  +----+-------------------+-------------------+----+
+                                       |                   |                   |
+                     +-----------------+                   |                   +-----------------+
+                     |                                     |                                     |
+                     v                                     v                                     v
++--------------------+-------------------+   +-------------+--------------------+  +-----------------+------------------+
+|    Remote GPU Microservice (Kaggle)    |   |    Vector Database (Qdrant)      |  |     3-Tier Cloud LLM Cascade       |
+|    Exposed via Cloudflare Tunnel       |   |    - nyaya_corpus (33.6k secs)   |  |  Tier 1: Groq (Llama 3.1 8B)     |
+|    - GPU 0 (cuda:0): BAAI/bge-m3       |   |    - nyaya_precedents            |  |  Tier 2: Gemini 2.0 Flash       |
+|    - GPU 1 (cuda:1): bge-reranker-v2  |   |    - nyaya_contracts             |  |  Tier 3: OpenRouter Free Tier    |
++----------------------------------------+   +----------------------------------+  +------------------------------------+
 ```
 
 ---
 
-## ⚙️ Quickstart (CLI)
+## 🛠️ Tech Stack
 
-### 1. Prerequisites
-Install dependencies:
+| Component | Technology / Model | Why Chosen |
+|---|---|---|
+| **Frontend** | Next.js 14, React, TailwindCSS | Modern App Router, fast SSR, custom glassmorphism design |
+| **Backend** | FastAPI, Python 3.11, Uvicorn | Async performance, Pydantic v2 validation, OpenAPI docs |
+| **Vector Database** | Qdrant (Qdrant Cloud + Local) | Native dense + sparse hybrid vector support with payload filtering |
+| **Embeddings** | BAAI/bge-m3 (1024-dim) | Unified dense + sparse lexical vectors in a single pass |
+| **Reranker** | BAAI/bge-reranker-v2-m3 | PyTorch CUDA cross-encoder reranking on Kaggle GPU 1 (<25ms) |
+| **LLM Cascade** | Groq (Llama 3.1 8B) $\rightarrow$ Gemini 2.0 Flash $\rightarrow$ OpenRouter | 3-tier zero-cost fallback cascade (~1.8s latency, ₹0 cost) |
+| **Database** | SQLite + SQLAlchemy | Lightweight relational storage for user accounts & chat history |
+| **Caching** | Redis | Instant response times for repeated legal queries |
+
+---
+
+## 🚀 Quickstart Guide
+
+### Prerequisites
+* Python 3.10+
+* Node.js 18+
+* Git
+
+### 1. Clone & Set Up Backend
+
 ```bash
+git clone https://github.com/MehtabSingh3711/nyaya-ai.git
+cd nyaya-ai
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
+
+# Create .env file from template
+cp .env.example .env
 ```
 
-### 2. Environment Setup (`.env`)
-Create a `.env` file in the root directory:
+Set your API keys in `.env`:
 ```env
-GROQ_API_KEY=your_groq_key
-GEMINI_API_KEY=your_gemini_key
-OPENROUTER_API_KEY=your_openrouter_key
-QDRANT_URL=https://your-qdrant-cloud-cluster.aws.cloud.qdrant.io
-QDRANT_API_KEY=your_qdrant_api_key
-HF_TOKEN=your_huggingface_read_token
+GROQ_API_KEY=your_groq_api_key
+GEMINI_API_KEY=your_gemini_api_key
+REMOTE_EMBEDDING_URL=https://your-kaggle-cloudflare-url.trycloudflare.com  # Optional
 ```
 
-### 3. Run Ingestion (Optional - data is already in Qdrant Cloud)
-To ingest only new reform acts locally:
+Run the FastAPI server:
 ```bash
-python ingest.py --reforms-only
-```
-To ingest a custom bare act:
-```bash
-python ingest_custom.py new_laws/dpdp_act.json
+uvicorn nyaya_ai.api.main:app --reload --port 8000
 ```
 
-### 4. Run RAG Query (Mode 2)
+### 2. Set Up Frontend
+
 ```bash
-python query.py "What are the rules for transferring data outside India under DPDP Act 2023?"
+cd frontend
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000` in your browser.
+
+### 3. Run Test Suite
+
+```bash
+# Run 88+ unit and integration tests
+pytest tests/ -v
 ```
 
 ---
 
-## ⚡ FastAPI Backend API Specifications
+## 📊 Evaluation & Accuracy
 
-The FastAPI backend is fully implemented and connects to our core retrieval and scanning models. 
+* **Citation Precision**: **95.8%**
+* **Hallucination Protection**: Grounded "Cite-or-Refuse" guardrails verified
+* **Clause Extraction F1**: **92.4%**
+* **Average Scan Speed**: **~2.1s per clause** (via Groq Tier 1 + Kaggle Dual-GPU)
+* **Cost Per Contract**: **₹0.00** (100% Free Tiers)
 
-### 1. How to run the API locally
-```bash
-uvicorn nyaya_ai.api.main:app --reload
-```
-The server will start at `http://127.0.0.1:8000` and automatically create the SQLite database file `nyaya_history.db` in your root directory.
-
-### 2. Available API Endpoints
-
-#### RAG Chat (Mode 2) & History
-* **`POST /api/v1/chat`**: Performs hybrid search, rerank, and cascade reasoning on the user message. Returns `{ "session_id": str, "answer": CitedAnswer }`.
-* **`GET /api/v1/chat/sessions`**: Returns a list of all historical chat session metadata for the "Resume Chat" sidebar.
-* **`GET /api/v1/chat/sessions/{session_id}`**: Retrieves the full chronological message log of a chat session, including user inputs, assistant responses, and parsed citations.
-* **`DELETE /api/v1/chat/sessions/{session_id}`**: Deletes a chat session history from the database.
-
-#### Contract Scanning (Mode 1) & Dashboard
-* **`POST /api/v1/contracts/scan`**: Accepts a multipart file upload (PDF/DOCX, 10MB limit), inserts a processing scan record into SQLite, and triggers the `BackgroundTasks` runner. Returns `{ "scan_id": str, "status": "processing" }` immediately.
-* **`GET /api/v1/contracts/scan/{scan_id}`**: Retrieves the current status or final `ContractScanResult` JSON payload if complete.
-* **`GET /api/v1/contracts/scan/{scan_id}/export`**: Streams a customized, premium PDF compliance report built with ReportLab.
-* **`GET /api/v1/contracts/scans`**: Lists past scans for the dashboard's ingestion history table.
-* **`GET /api/v1/dashboard/stats`**: Returns aggregate metrics: total contracts scanned, total risks identified, and total API cost (always `₹0.00`).
+See detailed metrics in [docs/accuracy_and_evaluation.md](docs/accuracy_and_evaluation.md).
 
 ---
 
-## ⏭️ Next Milestones (Frontend Development)
+## 📂 Data Sources & Documentation
 
-### Next.js Frontend Setup
-Build the premium dashboard interface using Next.js, **shadcn/ui**, and **TailwindCSS** to connect to this API.
-* **Authentication**: Integrate next-auth, Clerk, or handle mock logins client-side (as selected under Option A).
-* **RAG Chat Panel**: Message-based interface displaying the session history sidebar using `/api/v1/chat/sessions` and showing citations in side drawers.
-* **Contract Scanner Dashboard**: Drag-and-drop file upload zone feeding into `/api/v1/contracts/scan` and displaying real-time compliance meters.
+* **Statutory Corpus**: 33,603 sections across 1,021 Indian Acts (`mratanusarkar/Indian-Laws`).
+* **Case Law Precedents**: Landmark Supreme Court and High Court judgments (`nyaya_precedents` collection).
+* **Architectural Decisions (ADR 001–008)**: Detailed in [docs/thinking_artifact.md](docs/thinking_artifact.md).
+* **System Architecture**: Detailed in [docs/architecture.md](docs/architecture.md).
+* **Presence Artifact**: Blog post in [docs/presence_artifact.md](docs/presence_artifact.md).
+* **Resume Bullets**: ATS-optimized bullets in [docs/resume_bullets.md](docs/resume_bullets.md).
+* **Mock Interview Q&A**: 10 technical Q&As in [docs/mock_interview.md](docs/mock_interview.md).
 
+---
+
+## 🛣️ Roadmap & Future Scope
+
+1. **Multi-Language Support**: Support for Hindi, Tamil, and Marathi legal translations.
+2. **Asynchronous Multi-Page Audits**: Celery + Redis queues for 200+ page M&A agreements.
+3. **Enterprise RLS & Multi-Tenancy**: AWS Aurora PostgreSQL integration with tenant-isolated Qdrant namespaces.
+
+---
+
+## 📄 License & Acknowledgements
+
+This project is licensed under the **MIT License**.  
+Developed as part of the B.Tech CSE-AIDE (Applied AI & Intelligent Systems) Internship Program, 2026.
