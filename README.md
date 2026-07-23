@@ -13,8 +13,15 @@
 
 ## 🎬 Live Demo & Walkthrough
 
-* **Live Frontend**:http://localhost:3000
-* **Demo Video Walkthrough**: [5-Minute Loom Video Walkthrough](https://loom.com)
+<div align="center">
+  <video src="NyayaAI-Demo.mp4" controls autoplay loop muted width="100%">
+    Your browser does not support the video tag.
+  </video>
+  <br />
+  <p><i>Nyaya AI Full System Walkthrough — Mode 1 (Contract Scan) & Mode 2 (Statutory RAG Chat)</i></p>
+</div>
+
+* **Direct Video File**: [`NyayaAI-Demo.mp4`](./NyayaAI-Demo.mp4)
 
 ---
 

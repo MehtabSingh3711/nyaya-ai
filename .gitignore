@@ -59,3 +59,8 @@ temp_uploads/
 CLAUDE.md
 AGENTS.md
 .claude/
+questions.md
+nyaya_history.db-shm
+nyaya_history.db-wal
+
+docs/study
